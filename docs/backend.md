@@ -43,22 +43,29 @@ apps/server/src/
 | Rôle | Droits | Utilisé par |
 |---|---|---|
 | `sentinel_owner` | Propriétaire du schéma | Migrations uniquement |
-| `sentinel_ingest` | `INSERT` sur `event` et `emitter_status` ; rien d'autre | Ingestion |
-| `sentinel_app` | `SELECT` sur `event` ; lecture et écriture sur règles, alertes, incidents, sondes | Moteur, API du tableau de bord |
-| `sentinel_purge` | Détachement et suppression des partitions échues | Tâche de rétention |
+| `sentinel_ingest` | `INSERT` sur `event`, `event_key` et `emitter_status` ; lecture de `event_key.id` seule, pour `RETURNING` | Ingestion |
+| `sentinel_app` | `SELECT` sur `event` ; création des partitions par `ensure_event_partitions` ; lecture et écriture sur règles, alertes, incidents, sondes | Moteur, API du tableau de bord |
+| `sentinel_purge` | Détachement et suppression des partitions échues ; purge de `event_key` | Tâche de rétention |
 
 Aucun rôle applicatif n'a `UPDATE` ni `DELETE` sur `event` : la table est en ajout seul, par construction et pas par
 convention. Chaque processus se connecte avec le rôle minimal de sa tâche.
 
 ### 3.2 Table `event`
 
-- Partitionnée par mois sur `received_at` ; les partitions des deux mois suivants sont créées à l'avance.
-- Clé primaire `(id, received_at)` ; l'identifiant fourni par l'émetteur sert à la déduplication
-  (`INSERT … ON CONFLICT DO NOTHING`).
+- Partitionnée par mois sur `received_at` ; les partitions du mois courant et des deux suivants sont créées au démarrage
+  puis chaque jour par `sentinel.ensure_event_partitions` (`SECURITY DEFINER`, 1 à 24 mois, bornes en UTC). Une
+  partition par défaut recueille ce qui tomberait hors des partitions prévues : aucun événement n'est perdu.
+- Clé primaire `(id, received_at)`. PostgreSQL n'accepte pas d'index unique sur `id` seul dans une table partitionnée
+  par `received_at` : la déduplication passe donc par une table `event_key (id PRIMARY KEY, received_at)`.
+- Dans une même transaction, les identifiants du lot sont insérés dans `event_key`
+  (`ON CONFLICT (id) DO NOTHING RETURNING id`) ; seuls ceux qui reviennent sont écrits dans `event`. Deux lots
+  concurrents portant les mêmes événements les enregistrent donc une seule fois, ce que vérifie un test.
+- `event_key` sera purgée après 30 jours par la tâche de rétention (à venir) : au-delà, l'émetteur ne renvoie plus un lot (tampon en mémoire et
+  réessais bornés).
 - Colonnes extraites pour les règles et la recherche : `type`, `category`, `outcome`, `occurred_at`, `received_at`,
   `organization_id`, `store_id`, `user_id`, `email_hash`, `ip` (`inet`), `http_status` ; l'événement complet en `jsonb`.
-- Index : BRIN sur `received_at` ; B-tree sur `(type, received_at)`, `(email_hash, received_at)`, `(ip, received_at)`,
-  `(user_id, received_at)`.
+- Index : BRIN sur `received_at` ; B-tree sur `(type, received_at)` ; B-tree partiels (colonne non nulle) sur
+  `(email_hash, received_at)`, `(ip, received_at)`, `(user_id, received_at)`.
 - Rétention : 2 ans, par suppression de partitions entières (aucun `DELETE` ligne à ligne).
 
 ### 3.3 Requêtes
@@ -80,14 +87,19 @@ Ordre de traitement, chaque étape refusant avant la suivante :
 
 1. Taille du corps ≤ 1 Mo (413).
 2. Horodatage à ±300 s de l'horloge de Sentinel (401 `STALE_REQUEST`).
-3. Signature recalculée sur le **corps brut**, comparée en temps constant (401 `BAD_SIGNATURE`). Plusieurs secrets
+3. Signature recalculée sur le **corps brut**, comparée en temps constant (401 `BAD_SIGNATURE`). Deux secrets au plus
    acceptés pendant une rotation.
-4. Validation du lot par `eventBatchSchema` (422, lot entier refusé ; le détail des champs en erreur est renvoyé).
-5. Enregistrement en une transaction ; `received_at` posé par Sentinel.
-6. Réponse 202 `{ accepted, duplicates }`.
+4. Signature déjà vue dans les 10 dernières minutes : refusée (401 `REPLAYED`), en plus de la déduplication par
+   identifiant.
+5. Corps décodé en UTF-8 strict puis lu en JSON (400 `INVALID_BODY`).
+6. Validation du lot par `eventBatchSchema` (422 `VALIDATION_FAILED`, lot entier refusé ; jusqu'à 20 champs en erreur
+   renvoyés, par exemple `events.1.type`).
+7. Enregistrement en une transaction (§3.2) ; `received_at` posé par l'horloge de Sentinel.
+8. Réponse 202 `{ accepted, duplicates }`.
 
-- Une signature déjà vue dans la fenêtre de ±300 s est refusée (anti-rejeu), en plus de la déduplication par identifiant.
-- Débit borné par source ; au-delà, 429 avec `Retry-After`.
+- La mémoire anti-rejeu est locale au processus : un redémarrage la vide, la fenêtre d'horodatage et la déduplication
+  par identifiant restent alors les garde-fous.
+- Débit borné par source ; au-delà, 429 avec `Retry-After` (à venir, pas encore implémenté).
 - Le corps reçu n'est jamais écrit dans les journaux.
 
 ## 5. Moteur de corrélation

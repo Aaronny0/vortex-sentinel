@@ -1,0 +1,3 @@
+[test]
+# Les tests qui touchent PostgreSQL créent et suppriment leur propre base.
+timeout = 60000
