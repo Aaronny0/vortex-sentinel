@@ -312,7 +312,9 @@ Un SIEM est une cible : il concentre des informations sensibles et on peut cherc
 
 ## 10. Stack et organisation du dépôt
 
-- Bun, Elysia, PostgreSQL, Prisma, Zod, React pour le tableau de bord, comme Vortex.
+- Bun, Elysia, PostgreSQL, Zod, React pour le tableau de bord, comme Vortex. Accès base en SQL paramétré (`pg`) avec des
+  migrations SQL, sans ORM : partitions, droits par rôle et fenêtres glissantes s'écrivent mieux directement. Règles
+  détaillées : [backend.md](backend.md) ; interface : [frontend.md](frontend.md).
 - Organisation (décidé) :
 
 ```
