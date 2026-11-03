@@ -167,7 +167,7 @@ type SentinelEvent = {
   schemaVersion: 1;
   occurredAt: string;       // ISO 8601, horloge du producteur
   receivedAt: string;       // ajouté par Sentinel, fait foi pour les fenêtres
-  source: 'vortex-api' | 'vortex-web' | 'sentinel-probe';
+  source: 'vortex-api' | 'vortex-web' | 'vortex-nginx' | 'sentinel-probe';
   category: 'availability' | 'technical' | 'security' | 'business';
   type: string;             // ex. 'auth.login', 'sale.refund'
   outcome: 'success' | 'failure' | 'unknown';

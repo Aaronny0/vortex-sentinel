@@ -1,0 +1,10 @@
+{
+  "name": "vortex-sentinel",
+  "private": true,
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test"
+  }
+}
