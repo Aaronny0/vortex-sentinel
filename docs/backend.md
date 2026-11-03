@@ -132,20 +132,24 @@ toutes les autres.
 type Rule = {
   id: 'R05';
   version: number;                 // incrémentée à chaque changement de logique ou de seuil par défaut
-  kind: 'event' | 'window' | 'sequence';
-  severity: Severity;
-  window?: Duration;               // fenêtres et séquences
-  evaluate(ctx: RuleContext): Promise<Finding[]>;
+  kind: 'event' | 'window' | 'sequence' | 'state';
+  severity: Severity;              // gravité habituelle ; un constat peut la préciser (R15, R17)
+  graceMs: number;                 // délai laissé aux lots en retard (§ 5.2)
+  quietMs: number;                 // sans nouveau constat pendant cette durée, l'alerte est close
+  thresholds: Record<string, number>;
+  evaluate(ctx: RuleContext): Promise<Finding[]>;   // ctx = { query, at } : lecture seule, instant évalué
 };
 
 type Finding = {
-  key: string;                     // ce qui identifie l'alerte : compte, IP, cible, acteur
+  key: string;                     // ce qui identifie l'alerte : compte, IP, cible, chemin
   severity: Severity;
   summary: string;                 // phrase factuelle : « 14 échecs de connexion en 6 min »
-  evidence: string[];              // identifiants des événements déclencheurs
-  observedAt: Date;
+  evidence: string[];              // identifiants des événements déclencheurs (1 à 100)
 };
 ```
+
+Une règle `state` décrit l'état le plus récent d'une cible (sondes : R01, R02, R15, R17) ; elle refait son constat à
+chaque cycle tant que le problème dure. Le moteur valide chaque constat (Zod) avant de l'écrire.
 
 Une règle ne touche ni à la base des alertes ni aux incidents : elle lit des événements et renvoie des constats. Le
 moteur s'occupe du reste. Une règle est donc testable seule, avec des événements fabriqués et une horloge fixée.
@@ -155,7 +159,8 @@ moteur s'occupe du reste. Une règle est donc testable seule, avec des événeme
 - **`received_at` fait foi** pour les fenêtres : l'horloge de l'émetteur peut dériver, celle de Sentinel est la référence.
   `occurred_at` est affiché et sert à reconstituer la chronologie.
 - **Délai de grâce** de 60 s : une fenêtre `[t − durée, t]` n'est évaluée que lorsque `maintenant ≥ t + 60 s`, pour
-  laisser arriver les lots en retard.
+  laisser arriver les lots en retard. Il est nul pour les règles qui ne lisent que les sondes (R01, R15, R17) : Sentinel
+  écrit leurs résultats lui-même, sans lot en route. R02, qui lit les battements de l'émetteur, garde les 60 s.
 - Événement arrivé après ce délai : il est enregistré, et réévalué au cycle suivant à partir du point de reprise ;
   l'éventuelle alerte rejoint l'alerte existante grâce à la déduplication.
 - Toutes les dates sont en UTC dans le code et en base (`timestamptz`) ; le fuseau n'intervient qu'à l'affichage.
@@ -170,8 +175,14 @@ moteur s'occupe du reste. Une règle est donc testable seule, avec des événeme
 - **Déduplication** : une alerte ouverte est unique par `(rule_id, key)` (index unique partiel sur les alertes
   ouvertes). Un nouveau constat sur la même clé incrémente son compteur, ajoute ses preuves et met à jour
   `last_seen_at`.
-- **Fin d'alerte** : une alerte sans nouveau constat pendant sa période de calme (par défaut deux fenêtres) est close ;
-  un constat ultérieur en ouvre une nouvelle.
+- Un constat qui rejoint une alerte ouverte porte sa gravité **au plus haut** (R15 passe de moyenne à critique) ; elle
+  ne redescend pas tant que l'alerte est ouverte. Les premières preuves sont gardées (elles datent le début), les
+  suivantes ajoutées jusqu'à 100.
+- **Fin d'alerte** : une alerte sans nouveau constat pendant sa période de calme (`quietMs`, 2 min pour les règles
+  d'état) est close ; un constat ultérieur en ouvre une nouvelle. Une alerte n'est jamais supprimée (aucun `DELETE`
+  accordé).
+- Un cycle évalue les règles l'une après l'autre toutes les 30 s ; l'échec d'une règle est journalisé et n'empêche pas
+  les autres.
 
 ### 5.4 Reproductibilité
 

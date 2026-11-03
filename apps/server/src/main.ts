@@ -2,9 +2,12 @@ import { createApp } from './app.ts';
 import { systemClock } from './common/clock.ts';
 import { logError } from './common/safe-log.ts';
 import { loadEnv } from './config/env.ts';
+import { every } from './common/loop.ts';
 import { createPool, ensurePartitions } from './db/pools.ts';
+import { ENGINE_INTERVAL_MS, runEngineCycle } from './engine/engine.ts';
 import { MAX_INGEST_BYTES } from './ingest/ingest-plugin.ts';
 import { createProbes, startProbes } from './probes/runner.ts';
+import { rules } from './rules/registry.ts';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -26,12 +29,19 @@ const probeConfig = { health: env.PROBE_TARGETS, tls: env.TLS_TARGETS, disks: en
 const probeLoops = startProbes(createProbes({ ingestPool, clock, config: probeConfig }), probeConfig);
 console.log(`Sondes : ${probeConfig.health.length} santé, ${probeConfig.tls.length} certificat, ${probeConfig.disks.length} disque`);
 
+const engine = every(
+  ENGINE_INTERVAL_MS,
+  () => runEngineCycle(appPool, rules, clock, (rule, error) => logError(`Règle ${rule.id} :`, error)),
+  (error) => logError('Moteur :', error),
+);
+console.log(`Moteur de corrélation : ${rules.length} règles (${rules.map((rule) => rule.id).join(', ')})`);
+
 let stopping = false;
 const stop = async () => {
   if (stopping) return;
   stopping = true;
   clearInterval(partitions);
-  await Promise.all(probeLoops.map((loop) => loop.stop()));
+  await Promise.all([...probeLoops, engine].map((loop) => loop.stop()));
   await app.stop();
   await Promise.all([ingestPool.end(), appPool.end()]);
   process.exit(0);
