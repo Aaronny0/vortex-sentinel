@@ -2,6 +2,35 @@ import { z } from 'zod';
 
 const hexSecret = z.string().regex(/^[a-f0-9]{64,}$/, { error: 'Secret invalide : au moins 64 caractères hexadécimaux.' });
 
+/** Liste séparée par des virgules ; une variable absente vaut `fallback`. */
+const listOf = <T extends z.ZodType<unknown, string>>(item: T, fallback = '') =>
+  z
+    .string()
+    .default(fallback)
+    .transform((value) => value.split(',').map((entry) => entry.trim()).filter(Boolean))
+    .pipe(z.array(item));
+
+/** `nom=url` : `vortex-api=https://vortex.example/api/v1/health`. */
+const healthTarget = z
+  .string()
+  .transform((value) => ({ name: value.slice(0, Math.max(value.indexOf('='), 0)), url: value.slice(value.indexOf('=') + 1) }))
+  .pipe(
+    z.strictObject({
+      name: z.string().regex(/^[a-z][a-z0-9-]{1,31}$/, { error: 'Cible de sonde : nom=url attendu, nom en minuscules.' }),
+      url: z.url({ protocol: /^https?$/, error: 'Cible de sonde : URL http ou https attendue.' }),
+    }),
+  );
+
+/** `hôte` ou `hôte:port` (443 par défaut). */
+const tlsTarget = z
+  .string()
+  .regex(/^[a-z0-9.-]+(:\d{1,5})?$/i, { error: 'Cible TLS : hôte ou hôte:port attendu.' })
+  .transform((value) => {
+    const [host, port] = value.split(':');
+    return { host: host!.toLowerCase(), port: port ? Number(port) : 443 };
+  })
+  .pipe(z.strictObject({ host: z.string().min(1), port: z.int().min(1).max(65_535, { error: 'Cible TLS : port invalide.' }) }));
+
 const envSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65_535).default(4100),
   /** Login membre de `sentinel_ingest` : insère des événements, rien d'autre. */
@@ -13,6 +42,12 @@ const envSchema = z.object({
     .string()
     .transform((value) => value.split(',').map((secret) => secret.trim()))
     .pipe(z.array(hexSecret).min(1).max(2, { error: 'Deux secrets au plus (rotation).' })),
+  /** Points de santé interrogés toutes les 30 s (API et sites de Vortex). */
+  PROBE_TARGETS: listOf(healthTarget),
+  /** Hôtes dont le certificat est vérifié chaque jour ; vide en local, où Vortex est servi en HTTP. */
+  TLS_TARGETS: listOf(tlsTarget),
+  /** Systèmes de fichiers surveillés toutes les 5 min : celui de PostgreSQL et des journaux. */
+  DISK_PATHS: listOf(z.string().startsWith('/', { error: 'Chemin de disque absolu attendu.' }), '/'),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -102,6 +102,28 @@ Ordre de traitement, chaque étape refusant avant la suivante :
 - Débit borné par source ; au-delà, 429 avec `Retry-After` (à venir, pas encore implémenté).
 - Le corps reçu n'est jamais écrit dans les journaux.
 
+## 4 bis. Sondes
+
+Les sondes produisent des événements de source `sentinel-probe`, validés par le schéma partagé et enregistrés par
+`storeBatch`, le même chemin que les lots de Vortex. Elles n'ont pas de table à part : la règle R01 lit `event` comme
+toutes les autres.
+
+| Sonde | Rythme | Événement | Succès |
+|---|---|---|---|
+| Santé (`PROBE_TARGETS`, `nom=url`) | 30 s | `probe.check` : route, statut, durée, `code` d'erreur | Réponse 2xx en moins de 5 s |
+| Certificat (`TLS_TARGETS`, `hôte[:port]`) | 1 jour | `tls.certificate` : `validTo`, `daysLeft`, `authorized`, `code` | Certificat reconnu et pas expiré |
+| Disque (`DISK_PATHS`) | 5 min | `host.disk` : `freePercent`, `freeBytes`, `totalBytes` | Système de fichiers lisible |
+
+- Une redirection est un échec (`HTTP_302`) : une sonde vise l'adresse finale.
+- Le `code` enregistré est toujours un code court (`DATABASE_UNAVAILABLE`, `TIMEOUT`, `UNREACHABLE`, `HTTP_502`,
+  `ECONNREFUSED`), jamais un message libre ni le corps d'une page, qui pourraient contenir une donnée personnelle.
+- La sonde de certificat accepte un certificat invalide pour pouvoir le décrire ; les jours restants sont calculés à
+  l'heure de l'horloge injectée, ce qui rend R15 testable sans attendre une expiration.
+- L'espace libre est l'espace disponible pour un processus ordinaire (`bavail`), pas la réserve de l'administrateur.
+- Chaque tournée s'exécute à nouveau un intervalle après la fin de la précédente : deux tournées ne se chevauchent
+  jamais. Une erreur est journalisée et n'arrête pas la boucle.
+- Une sonde mesure, elle ne décide pas : les seuils (3 échecs, 14 jours, 15 %) sont ceux des règles R01, R15 et R17.
+
 ## 5. Moteur de corrélation
 
 ### 5.1 Contrat d'une règle

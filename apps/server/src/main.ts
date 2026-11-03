@@ -4,6 +4,7 @@ import { logError } from './common/safe-log.ts';
 import { loadEnv } from './config/env.ts';
 import { createPool, ensurePartitions } from './db/pools.ts';
 import { MAX_INGEST_BYTES } from './ingest/ingest-plugin.ts';
+import { createProbes, startProbes } from './probes/runner.ts';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -21,11 +22,16 @@ const app = createApp({ ingestPool, appPool, clock, secrets: env.INGEST_SECRETS 
 });
 console.log(`Sentinel démarré sur le port ${env.PORT}`);
 
+const probeConfig = { health: env.PROBE_TARGETS, tls: env.TLS_TARGETS, disks: env.DISK_PATHS };
+const probeLoops = startProbes(createProbes({ ingestPool, clock, config: probeConfig }), probeConfig);
+console.log(`Sondes : ${probeConfig.health.length} santé, ${probeConfig.tls.length} certificat, ${probeConfig.disks.length} disque`);
+
 let stopping = false;
 const stop = async () => {
   if (stopping) return;
   stopping = true;
   clearInterval(partitions);
+  await Promise.all(probeLoops.map((loop) => loop.stop()));
   await app.stop();
   await Promise.all([ingestPool.end(), appPool.end()]);
   process.exit(0);

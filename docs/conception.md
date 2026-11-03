@@ -275,7 +275,7 @@ et l'évaluation.
 | Table | Contenu |
 |---|---|
 | `event` | Événements normalisés. Partitionnée par mois, conservée 2 ans (suppression d'une partition entière à l'échéance). Ajout seul (aucun UPDATE ni DELETE pour le rôle applicatif). |
-| `probe_target`, `probe_result` | Cibles surveillées et résultats des sondes. |
+| *(pas de table propre aux sondes)* | Les résultats des sondes sont des événements (`probe.check`, `tls.certificate`, `host.disk`) enregistrés dans `event` : une seule source de vérité, en ajout seul, rejouable. Les cibles sont lues dans la configuration (`PROBE_TARGETS`, `TLS_TARGETS`, `DISK_PATHS`) ; une table `probe_target` viendra avec leur gestion depuis le tableau de bord. |
 | `emitter_status` | Dernier battement de cœur et compteurs de l'émetteur. |
 | `rule` | Règles, seuils, gravité, activation. |
 | `rule_checkpoint` | Dernier point traité par règle. |

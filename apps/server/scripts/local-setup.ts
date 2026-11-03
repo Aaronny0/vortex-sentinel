@@ -83,6 +83,10 @@ const next = {
   PORT: current.PORT ?? '4100',
   ...urls,
   INGEST_SECRETS: current.INGEST_SECRETS ?? randomBytes(32).toString('hex'),
+  // API de Vortex en développement (apps/api, port 3001).
+  PROBE_TARGETS: current.PROBE_TARGETS ?? 'vortex-api=http://127.0.0.1:3001/api/v1/health',
+  TLS_TARGETS: current.TLS_TARGETS ?? '',
+  DISK_PATHS: current.DISK_PATHS ?? '/',
 };
 writeFileSync(envPath, `${Object.entries(next).map(([key, value]) => `${key}=${value}`).join('\n')}\n`, { mode: 0o600 });
 console.log(`Fichier ${envPath} prêt (non versionné). Démarrage : bun run dev`);
