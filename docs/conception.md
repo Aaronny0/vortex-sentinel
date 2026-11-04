@@ -226,6 +226,17 @@ Toutes les valeurs de seuil sont configurables ; celles-ci sont les valeurs init
 | R16 | Technique | ≥ 3 échecs d'envoi d'email en 15 min (les utilisateurs ne reçoivent plus leurs codes) | Élevée |
 | R17 | Disponibilité | Espace disque libre inférieur à 15 % (moins de 5 % : critique) | Élevée / critique |
 
+**Précisions de mise en œuvre** (décidées en écrivant les règles, chacune testée) :
+
+- **R03** : cinq minutes *consécutives* au-dessus du seuil ; une minute sans trafic rompt la suite.
+- **R04** : 5 % pile ne déclenche pas (« plus de 5 % ») ; une seule alerte pour l'ensemble des routes.
+- **R07** : les conditions de R05 et R06 sont recalculées sur les événements, sans lire les alertes : la règle reste
+  rejouable. Des refus et une réussite arrivés dans le même lot (l'émetteur regroupe quelques secondes) sont ordonnés par
+  l'heure de l'événement.
+- **R08** : la capture HTTP de Vortex ne connaît pas l'utilisateur d'une requête refusée ; l'acteur est l'utilisateur
+  quand il est connu, sinon le compte, sinon l'adresse IP.
+- **R09** : un compte sans aucune connexion dans les 30 jours n'a pas d'habitudes et ne déclenche pas (nouveau compte).
+
 Les règles R07 et R09 sont des **règles de séquence** : elles relient des événements de natures différentes (sécurité puis
 sécurité, sécurité puis métier). C'est l'apport principal d'un SIEM par rapport à une supervision.
 
