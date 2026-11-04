@@ -6,6 +6,7 @@ import { every } from './common/loop.ts';
 import { createPool, ensurePartitions } from './db/pools.ts';
 import { ENGINE_INTERVAL_MS, runEngineCycle } from './engine/engine.ts';
 import { purgeExpired } from './db/retention.ts';
+import { sendPendingNotifications, smtpSender } from './notify/notifier.ts';
 import { MAX_INGEST_BYTES } from './ingest/ingest-plugin.ts';
 import { createProbes, startProbes } from './probes/runner.ts';
 import { rules } from './rules/registry.ts';
@@ -44,6 +45,24 @@ const engine = every(
 );
 console.log(`Moteur de corrélation : ${rules.length} règles (${rules.map((rule) => rule.id).join(', ')})`);
 
+// Notifications : toutes les 30 s, si un serveur SMTP est configuré.
+const mailFrom = env.MAIL_FROM ?? env.SMTP_USER;
+const notifications =
+  env.SMTP_HOST && mailFrom
+    ? every(
+        30_000,
+        () =>
+          sendPendingNotifications(
+            appPool,
+            clock,
+            smtpSender({ host: env.SMTP_HOST!, port: env.SMTP_PORT, secure: (env.SMTP_SECURE ?? String(env.SMTP_PORT === 465)) === 'true', user: env.SMTP_USER, password: env.SMTP_PASSWORD, from: mailFrom }),
+            env.DASHBOARD_ORIGIN,
+          ),
+        (error) => logError('Notifications :', error),
+      )
+    : undefined;
+if (!notifications) console.warn('Notifications désactivées : SMTP_HOST et MAIL_FROM non configurés.');
+
 // Rétention : chaque jour, partitions de plus de 2 ans et clés de déduplication de plus de 30 jours.
 const retention = every(
   DAY_MS,
@@ -59,7 +78,7 @@ const stop = async () => {
   if (stopping) return;
   stopping = true;
   clearInterval(partitions);
-  await Promise.all([...probeLoops, engine, retention].map((loop) => loop.stop()));
+  await Promise.all([...probeLoops, engine, retention, ...(notifications ? [notifications] : [])].map((loop) => loop.stop()));
   await app.stop();
   await Promise.all([ingestPool.end(), appPool.end()]);
   process.exit(0);

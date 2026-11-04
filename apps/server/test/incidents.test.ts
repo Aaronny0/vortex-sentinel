@@ -33,7 +33,7 @@ afterAll(async () => db?.drop());
 beforeEach(async () => {
   clock.set(START);
   await db.admin.query(
-    'TRUNCATE sentinel.event, sentinel.event_key, sentinel.incident_history, sentinel.incident_alert, sentinel.incident, sentinel.alert, sentinel.rule_checkpoint',
+    'TRUNCATE sentinel.event, sentinel.event_key, sentinel.notification, sentinel.incident_history, sentinel.incident_alert, sentinel.incident, sentinel.alert, sentinel.rule_checkpoint',
   );
 });
 

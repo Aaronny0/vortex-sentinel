@@ -96,7 +96,7 @@ est signalée par Better Auth (`auth.login`) et non par la capture HTTP, qui n'a
 | Lecteur de journaux | *Reporté à la migration sur le VPS* (voir ci-dessous). Les réponses introuvables et rejetées viennent pour l'instant de l'émetteur de Vortex. |
 | Corrélation | Évalue les règles à la réception (règles simples) et toutes les 30 s par fenêtres glissantes en SQL (règles de seuil et de séquence). |
 | Alertes et incidents | Crée les alertes, les déduplique, ouvre ou alimente les incidents, gère leur cycle de vie. |
-| Notifications | Email aux responsables pour les gravités élevée et critique. |
+| Notifications | Email aux administrateurs et analystes pour les incidents élevés et critiques (ouverture, ou gravité relevée). File d'attente écrite avec l'incident, envoi séparé avec 4 nouvelles tentatives ; texte expurgé (ni IP ni compte), détail dans le tableau de bord. |
 | Tableau de bord | Application web propre à Sentinel : état des services, alertes, incidents, recherche d'événements. Servie par Sentinel, elle reste disponible quand Vortex est en panne. |
 
 **Journal Nginx** (décidé le 2026-11-04) : dans le déploiement actuel, Nginx est derrière Traefik dans Docker. Son

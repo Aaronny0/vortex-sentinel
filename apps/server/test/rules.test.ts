@@ -28,7 +28,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   clock.set(START);
-  await db.admin.query('TRUNCATE sentinel.event, sentinel.event_key, sentinel.incident_history, sentinel.incident_alert, sentinel.incident, sentinel.alert, sentinel.rule_checkpoint');
+  await db.admin.query('TRUNCATE sentinel.event, sentinel.event_key, sentinel.notification, sentinel.incident_history, sentinel.incident_alert, sentinel.incident, sentinel.alert, sentinel.rule_checkpoint');
 });
 
 const ago = (ms: number) => new Date(clock.now().getTime() - ms);
@@ -212,7 +212,7 @@ describe('R15 : certificat bientôt expiré', () => {
       [-1, 'critical', 'Le certificat de vortex.test:443 a expiré le 2026-11-02'],
     ];
     for (const [days, severity, summary] of cases) {
-      await db.admin.query('TRUNCATE sentinel.event, sentinel.event_key, sentinel.incident_history, sentinel.incident_alert, sentinel.incident, sentinel.alert, sentinel.rule_checkpoint');
+      await db.admin.query('TRUNCATE sentinel.event, sentinel.event_key, sentinel.notification, sentinel.incident_history, sentinel.incident_alert, sentinel.incident, sentinel.alert, sentinel.rule_checkpoint');
       await receive(certificate(inDays(days)), ago(MINUTE_MS));
       await run(r15CertificateExpiry);
       const rows = await alerts();

@@ -19,10 +19,20 @@ export async function linkAlertToIncident(client: PoolClient, alert: Alert, at: 
   if (!INCIDENT_SEVERITIES.includes(alert.severity)) return null;
   const history = (incidentId: string, kind: string, comment: string) =>
     client.query('INSERT INTO sentinel.incident_history (incident_id, at, kind, comment) VALUES ($1, $2, $3, $4)', [incidentId, at, kind, comment]);
+  /** Élevée ou critique : email aux opérateurs, mis en file dans cette même transaction (une fois par gravité atteinte). */
+  const notify = (incidentId: string, kind: 'opened' | 'raised') =>
+    alert.severity === 'high' || alert.severity === 'critical'
+      ? client.query(
+          `INSERT INTO sentinel.notification (incident_id, kind, severity, created_at, next_attempt_at) VALUES ($1, $2, $3, $4, $4)
+           ON CONFLICT (incident_id, severity) DO NOTHING`,
+          [incidentId, kind, alert.severity, at],
+        )
+      : undefined;
   const raise = async (incidentId: string, current: string) => {
     if (rank(alert.severity) <= rank(current)) return;
     await client.query('UPDATE sentinel.incident SET severity = $2, updated_at = $3 WHERE id = $1', [incidentId, alert.severity, at]);
     await history(incidentId, 'severity_raised', `Gravité portée à ${alert.severity} par ${alert.ruleId} : ${alert.summary}`);
+    await notify(incidentId, 'raised');
   };
 
   // Déjà rattachée (alerte qui dure ou s'aggrave) : seule la gravité de son incident peut évoluer, s'il est encore actif.
@@ -44,7 +54,10 @@ export async function linkAlertToIncident(client: PoolClient, alert: Alert, at: 
   );
   let incidentId = created[0]?.id;
   const opened = !!incidentId;
-  if (incidentId) await history(incidentId, 'opened', `Ouvert par ${alert.ruleId} : ${alert.summary}`);
+  if (incidentId) {
+    await history(incidentId, 'opened', `Ouvert par ${alert.ruleId} : ${alert.summary}`);
+    await notify(incidentId, 'opened');
+  }
   else {
     const { rows } = await client.query<{ id: string; severity: string }>(
       `SELECT id, severity FROM sentinel.incident WHERE key = $1 AND status IN ('open', 'acknowledged', 'in_progress') FOR UPDATE`,

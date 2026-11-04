@@ -46,6 +46,13 @@ const envSchema = z.object({
   OPERATOR_SECRET_KEY: z.string().regex(/^[a-f0-9]{64}$/, { error: 'OPERATOR_SECRET_KEY : 64 caractères hexadécimaux.' }),
   /** Origine du tableau de bord, seule autorisée à écrire (connexion, transitions). */
   DASHBOARD_ORIGIN: z.url({ protocol: /^https?$/, error: 'DASHBOARD_ORIGIN doit être une URL http ou https.' }).transform((value) => value.replace(/\/$/, '')).default('http://localhost:4100'),
+  /** Serveur SMTP des notifications (incidents élevés et critiques) ; sans SMTP_HOST, aucune notification n'est envoyée. */
+  SMTP_HOST: z.string().min(1).optional(),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65_535).default(465),
+  SMTP_SECURE: z.enum(['true', 'false']).optional(),
+  SMTP_USER: z.string().min(1).optional(),
+  SMTP_PASSWORD: z.string().min(1).optional(),
+  MAIL_FROM: z.email({ error: 'MAIL_FROM : adresse email attendue.' }).optional(),
   /** Points de santé interrogés toutes les 30 s (API et sites de Vortex). */
   PROBE_TARGETS: listOf(healthTarget),
   /** Hôtes dont le certificat est vérifié chaque jour ; vide en local, où Vortex est servi en HTTP. */

@@ -33,7 +33,7 @@ beforeAll(async () => {
 afterAll(async () => db?.drop());
 beforeEach(async () => {
   clock.set(START);
-  await db.admin.query('TRUNCATE sentinel.event, sentinel.event_key, sentinel.incident_history, sentinel.incident_alert, sentinel.incident, sentinel.alert, sentinel.rule_checkpoint');
+  await db.admin.query('TRUNCATE sentinel.event, sentinel.event_key, sentinel.notification, sentinel.incident_history, sentinel.incident_alert, sentinel.incident, sentinel.alert, sentinel.rule_checkpoint');
 });
 
 const GRACE = MINUTE_MS;
@@ -144,7 +144,7 @@ describe('R07 : connexion réussie après une attaque', () => {
     await storeBatch(db.ingestPool, [...failures, success], at);
     expect(await run(r07Compromise)).toMatchObject({ findings: 1 });
     // Une réussite survenue avant les refus du même lot n'est pas une compromission.
-    await db.admin.query('TRUNCATE sentinel.event, sentinel.event_key, sentinel.incident_history, sentinel.incident_alert, sentinel.incident, sentinel.alert, sentinel.rule_checkpoint');
+    await db.admin.query('TRUNCATE sentinel.event, sentinel.event_key, sentinel.notification, sentinel.incident_history, sentinel.incident_alert, sentinel.incident, sentinel.alert, sentinel.rule_checkpoint');
     await storeBatch(db.ingestPool, [{ ...success, id: crypto.randomUUID(), occurredAt: new Date(at.getTime() - 60 * SECOND).toISOString() }, ...failures.map((event) => ({ ...event, id: crypto.randomUUID() }))], at);
     expect(await run(r07Compromise)).toMatchObject({ findings: 0 });
   });
