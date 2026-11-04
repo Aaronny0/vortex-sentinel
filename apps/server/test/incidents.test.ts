@@ -23,6 +23,11 @@ const otherAnalyst = randomUUID();
 beforeAll(async () => {
   db = await createTestDb();
   await ensurePartitions(db.appPool, clock);
+  for (const [id, name] of [[analyst, 'Analyste A'], [otherAnalyst, 'Analyste B']])
+    await db.admin.query(
+      `INSERT INTO sentinel.operator (id, email, name, role, password_hash, created_at, updated_at) VALUES ($1, $2, $3, 'analyst', 'x', now(), now())`,
+      [id, `${id}@sentinel.test`, name],
+    );
 });
 afterAll(async () => db?.drop());
 beforeEach(async () => {

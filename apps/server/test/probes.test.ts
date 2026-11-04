@@ -191,7 +191,7 @@ describe('sonde de disque', () => {
 });
 
 describe('configuration des sondes', () => {
-  const base = { INGEST_DATABASE_URL: 'postgresql://a@b/c', APP_DATABASE_URL: 'postgresql://a@b/c', INGEST_SECRETS: 'a'.repeat(64) };
+  const base = { INGEST_DATABASE_URL: 'postgresql://a@b/c', APP_DATABASE_URL: 'postgresql://a@b/c', INGEST_SECRETS: 'a'.repeat(64), OPERATOR_SECRET_KEY: 'b'.repeat(64) };
 
   test('lit les cibles ; sans configuration, seul le disque racine est surveillé', () => {
     const env = loadEnv({ ...base, PROBE_TARGETS: 'vortex-api=http://127.0.0.1:3001/api/v1/health, web=https://vortex.test/healthz', TLS_TARGETS: 'Vortex.test,admin.vortex.test:8443' });

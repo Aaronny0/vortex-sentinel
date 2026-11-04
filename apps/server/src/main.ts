@@ -19,7 +19,14 @@ const appPool = createPool(env.APP_DATABASE_URL, 'sentinel-app', 5);
 await ensurePartitions(appPool, clock);
 const partitions = setInterval(() => ensurePartitions(appPool, clock).catch((error) => logError('Partitions :', error)), DAY_MS);
 
-const app = createApp({ ingestPool, appPool, clock, secrets: env.INGEST_SECRETS }).listen({
+const app = createApp({
+  ingestPool,
+  appPool,
+  clock,
+  secrets: env.INGEST_SECRETS,
+  operatorSecretKey: Buffer.from(env.OPERATOR_SECRET_KEY, 'hex'),
+  dashboardOrigin: env.DASHBOARD_ORIGIN,
+}).listen({
   port: env.PORT,
   maxRequestBodySize: MAX_INGEST_BYTES + 1024,
 });

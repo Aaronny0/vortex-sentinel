@@ -52,7 +52,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await db.admin.query('TRUNCATE sentinel.event, sentinel.event_key');
-  app = createApp({ ingestPool: db.ingestPool, appPool: db.appPool, clock, secrets: [secret] });
+  app = createApp({ ingestPool: db.ingestPool, appPool: db.appPool, clock, secrets: [secret], operatorSecretKey: Buffer.alloc(32, 7), dashboardOrigin: 'http://sentinel.test' });
 });
 
 describe('ingestion : réussite', () => {

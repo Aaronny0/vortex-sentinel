@@ -87,6 +87,8 @@ const next = {
   PROBE_TARGETS: current.PROBE_TARGETS ?? 'vortex-api=http://127.0.0.1:3001/api/v1/health',
   TLS_TARGETS: current.TLS_TARGETS ?? '',
   DISK_PATHS: current.DISK_PATHS ?? '/',
+  OPERATOR_SECRET_KEY: current.OPERATOR_SECRET_KEY ?? randomBytes(32).toString('hex'),
+  DASHBOARD_ORIGIN: current.DASHBOARD_ORIGIN ?? 'http://localhost:4100',
 };
 writeFileSync(envPath, `${Object.entries(next).map(([key, value]) => `${key}=${value}`).join('\n')}\n`, { mode: 0o600 });
 console.log(`Fichier ${envPath} prêt (non versionné). Démarrage : bun run dev`);

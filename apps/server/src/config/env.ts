@@ -42,6 +42,10 @@ const envSchema = z.object({
     .string()
     .transform((value) => value.split(',').map((secret) => secret.trim()))
     .pipe(z.array(hexSecret).min(1).max(2, { error: 'Deux secrets au plus (rotation).' })),
+  /** Clé AES-256 (64 caractères hexadécimaux) qui chiffre les secrets de double authentification des opérateurs. */
+  OPERATOR_SECRET_KEY: z.string().regex(/^[a-f0-9]{64}$/, { error: 'OPERATOR_SECRET_KEY : 64 caractères hexadécimaux.' }),
+  /** Origine du tableau de bord, seule autorisée à écrire (connexion, transitions). */
+  DASHBOARD_ORIGIN: z.url({ protocol: /^https?$/, error: 'DASHBOARD_ORIGIN doit être une URL http ou https.' }).transform((value) => value.replace(/\/$/, '')).default('http://localhost:4100'),
   /** Points de santé interrogés toutes les 30 s (API et sites de Vortex). */
   PROBE_TARGETS: listOf(healthTarget),
   /** Hôtes dont le certificat est vérifié chaque jour ; vide en local, où Vortex est servi en HTTP. */

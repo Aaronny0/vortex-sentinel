@@ -347,6 +347,13 @@ Un SIEM est une cible : il concentre des informations sensibles et on peut cherc
 
 - **Ingestion** authentifiée par HMAC (secret partagé avec Vortex uniquement) et horodatage à ±5 min contre le rejeu.
 - **Opérateurs** : comptes propres, double authentification obligatoire, aucune création de compte en libre-service.
+  Mise en œuvre : mot de passe (Argon2id, 12 caractères au moins) puis code TOTP (RFC 6238, applications courantes),
+  activé à la première connexion ; un code déjà utilisé est refusé. Secrets TOTP chiffrés en base (AES-256-GCM,
+  `OPERATOR_SECRET_KEY`). Session par cookie httpOnly, SameSite=Strict, Secure en HTTPS, dont seule l'empreinte est en
+  base ; 12 h au plus, 2 h d'inactivité. 10 refus par compte (et par adresse quand elle est connue) en 15 min : 429.
+  Toute écriture vérifie l'origine. Premier administrateur : `bun run operator:create`.
+- **Journal d'audit** (`operator_audit`, ajout seul) : connexions et refus, consultations de preuves et recherches
+  d'événements (qui a vu quelles adresses IP), transitions et commentaires, gestion des comptes.
 - **Lecture seule sur Vortex** : Sentinel n'agit jamais sur Vortex.
 - **Intégrité des événements** : table en ajout seul. Perspective : chaînage des lots par empreinte pour détecter une
   suppression.

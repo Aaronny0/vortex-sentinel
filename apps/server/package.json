@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "db:migrate": "bun scripts/migrate.ts",
-    "local:setup": "bun scripts/local-setup.ts"
+    "local:setup": "bun scripts/local-setup.ts",
+    "operator:create": "bun scripts/create-operator.ts"
   },
   "dependencies": {
     "@sentinel/schema": "workspace:*",
