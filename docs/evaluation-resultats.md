@@ -3,7 +3,7 @@
 Produit par `bun run evaluate` (apps/server/evaluation) le 2026-11-04. Données fictives, base jetable, horloge
 simulée ; moteur réel évalué toutes les 30 s (10 min pour la semaine normale, 5 min et 1 min pour les scénarios longs).
 
-- **Taux de détection** : 14 règles attendues détectées sur 14 (100 %).
+- **Taux de détection** : 20 règles attendues détectées sur 20 (100 %).
 - **Faux positifs** : 0, dont 0 sur une semaine d’activité normale simulée.
 - **Délai de détection** : médiane 90 s, maximum 300 s, mesuré entre l’événement qui remplit la condition et le cycle du moteur qui crée l’alerte.
 
@@ -21,6 +21,12 @@ simulée ; moteur réel évalué toutes les 30 s (10 min pour la semaine normale
 | S10 · Certificat proche de l'expiration | R15 | R15 (moyenne, 0 s) | aucun |
 | S11 · Serveur email injoignable | R16 | R16 (élevée, 90 s) | aucun |
 | S12 · Disque presque plein | R17 | R17 (élevée, 0 s) | aucun |
+| S14 · Recherche de droits : accès refusés répétés | R08 | R08 (moyenne, 80 s) | aucun |
+| S15 · Pertes de stock répétées sur un produit | R12 | R12 (moyenne, 120 s) | aucun |
+| S16 · Opération de caisse à une heure inhabituelle | R13 | R13 (faible, 120 s) | aucun |
+| S17 · Fonctionnalité en panne, trafic faible | R18 | R18 (élevée, 90 s) | aucun |
+| S18 · Administration depuis une adresse inconnue | R19 | R19 (élevée, 90 s) | aucun |
+| S19 · Rafale d'actions d'administration sensibles | R20 | R20 (élevée, 90 s) | aucun |
 | S13 · Activité normale pendant une semaine | aucune | — | aucun |
 
 ## Lecture

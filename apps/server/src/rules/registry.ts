@@ -15,6 +15,9 @@ import { r14ApiProbing } from './r14-api-probing.ts';
 import { r16MailFailures } from './r16-mail-failures.ts';
 import { r15CertificateExpiry } from './r15-certificate-expiry.ts';
 import { r17DiskSpace } from './r17-disk-space.ts';
+import { r18RepeatedErrors } from './r18-repeated-errors.ts';
+import { r19AdminNewIp } from './r19-admin-new-ip.ts';
+import { r20AdminBurst } from './r20-admin-burst.ts';
 import type { Rule } from './types.ts';
 
 /** Règles actives (docs/conception.md § 6), dans l'ordre d'évaluation. */
@@ -36,4 +39,7 @@ export const rules: readonly Rule[] = [
   r15CertificateExpiry,
   r16MailFailures,
   r17DiskSpace,
+  r18RepeatedErrors,
+  r19AdminNewIp,
+  r20AdminBurst,
 ];

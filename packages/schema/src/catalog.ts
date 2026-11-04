@@ -47,6 +47,8 @@ export const eventCatalog: Readonly<Record<string, EventCategory>> = {
   'access.denied': 'security',
   'access.unauthenticated': 'security',
   'access.status_changed': 'security',
+  /** Action d'un administrateur de la plateforme (abonnement, catalogue, inventaire initial…), après le COMMIT. */
+  'admin.action': 'security',
   'idempotency.conflict': 'security',
 
   ...Object.fromEntries(businessEventTypes.map((type) => [type, 'business' as const])),

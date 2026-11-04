@@ -1,6 +1,6 @@
 ---
 name: sentinel-backend
-description: Écrire, modifier ou revoir le serveur de Vortex Sentinel (apps/server) ou l'émetteur côté Vortex - ingestion, sondes, règles de corrélation R01 à R17, moteur, alertes, incidents, migrations SQL, rôles PostgreSQL, tests. À charger avant la première modification côté serveur.
+description: Écrire, modifier ou revoir le serveur de Vortex Sentinel (apps/server) ou l'émetteur côté Vortex - ingestion, sondes, règles de corrélation R01 à R20, moteur, alertes, incidents, migrations SQL, rôles PostgreSQL, tests. À charger avant la première modification côté serveur.
 ---
 
 # Serveur de Vortex Sentinel

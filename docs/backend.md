@@ -1,7 +1,7 @@
 # Serveur de Vortex Sentinel — règles d'ingénierie backend
 
 Version 1.0 — 2026-11-03. Ce document fait autorité pour `apps/server` et pour l'émetteur ajouté à Vortex. La conception
-fonctionnelle (missions, règles R01 à R17, cycle de vie des incidents) est dans [conception.md](conception.md).
+fonctionnelle (missions, règles R01 à R20, cycle de vie des incidents) est dans [conception.md](conception.md).
 
 Un SIEM n'a de valeur que si l'on peut croire ce qu'il affiche. Toutes les règles ci-dessous découlent de trois exigences :
 **ne rien perdre sans le savoir, ne rien compter deux fois, et pouvoir rejouer n'importe quelle détection à l'identique.**

@@ -20,10 +20,11 @@ Correspondance avec le cahier des charges :
 |---|---|
 | Vérifier que Vortex est accessible, détecter les interruptions | Sondes (§ 3.2), R01, R02 |
 | Surveiller les services essentiels | Sondes API, base, Nginx, certificat TLS, disque ; échecs d'envoi d'email (R16) |
-| Détecter les erreurs, bugs et dysfonctionnements | Événements techniques (§ 4.2), R03, R04 |
+| Détecter les erreurs, bugs et dysfonctionnements | Événements techniques (§ 4.2), R03, R04, R18 |
 | Surveiller les journaux | Journaux de l'API via l'émetteur, journal d'accès Nginx lu par Sentinel (§ 4.2) |
 | Identifier les comportements anormaux, signaler l'inhabituel | Références comportementales (§ 6.1), R09, R10, R13 |
 | Connexions suspectes, force brute, intrusion | R05 à R09, R14 |
+| Activité inhabituelle des administrateurs de la plateforme, traçabilité de leurs actions | `admin.action`, `access.status_changed` (§ 4.3), R19, R20 |
 | Centraliser, classer par gravité, historiser, suivre jusqu'à la résolution | § 7 |
 | Détecter **avant** que les utilisateurs soient touchés | Règles d'alerte précoce : latence (R03), certificat (R15), disque (R17) |
 
@@ -97,7 +98,7 @@ est signalée par Better Auth (`auth.login`) et non par la capture HTTP, qui n'a
 | Corrélation | Évalue les règles à la réception (règles simples) et toutes les 30 s par fenêtres glissantes en SQL (règles de seuil et de séquence). |
 | Alertes et incidents | Crée les alertes, les déduplique, ouvre ou alimente les incidents, gère leur cycle de vie. |
 | Notifications | Email aux administrateurs et analystes pour les incidents élevés et critiques (ouverture, ou gravité relevée). File d'attente écrite avec l'incident, envoi séparé avec 4 nouvelles tentatives ; texte expurgé (ni IP ni compte), détail dans le tableau de bord. |
-| Tableau de bord | Application web propre à Sentinel : état des services, alertes, incidents, recherche d'événements. Servie par Sentinel, elle reste disponible quand Vortex est en panne. |
+| Tableau de bord | Application web propre à Sentinel : état des services, évolution des erreurs, alertes, incidents, recherche d'événements. Servie par Sentinel, elle reste disponible quand Vortex est en panne. Installable sur ordinateur et téléphone (PWA) ; le service worker garde l'interface, jamais les données (§ 9). |
 
 **Journal Nginx** (décidé le 2026-11-04) : dans le déploiement actuel, Nginx est derrière Traefik dans Docker. Son
 journal porte l'adresse du proxy (`$remote_addr`), pas celle du navigateur, et part sur la sortie du conteneur plutôt que
@@ -149,7 +150,8 @@ journaux texte), **à ajouter**.
 | `auth.otp_sent`, `auth.otp_refused` (adresse non autorisée, quota) | `otp-guard.ts` | à ajouter |
 | `access.denied` (403 `FORBIDDEN`, `ORIGIN_REFUSED`, garde admin) | Moteur de commandes, `admin-guard`, plugins | à ajouter |
 | `access.unauthenticated` (401) | `error-plugin.ts` | à ajouter |
-| `access.status_changed` (demande d'accès approuvée ou refusée) | Plateforme admin | existe (action admin) |
+| `access.status_changed` (demande d'accès approuvée ou refusée) | Plateforme admin, après le COMMIT | réalisé |
+| `admin.action` (inventaire initial, décision de catalogue, paiement, suspension, tarif, montant par défaut) | Plateforme admin (`withPlatform`), après le COMMIT, jamais pour un rejeu | réalisé |
 | `idempotency.conflict` (409, même clé avec un contenu différent) | Moteur de commandes, plateforme | à ajouter |
 
 ### 4.4 Métier
@@ -232,6 +234,9 @@ Toutes les valeurs de seuil sont configurables ; celles-ci sont les valeurs init
 | R15 | Disponibilité | Certificat TLS expirant dans moins de 14 jours (moins de 3 jours : critique) | Moyenne / critique |
 | R16 | Technique | ≥ 3 échecs d'envoi d'email en 15 min (les utilisateurs ne reçoivent plus leurs codes) | Élevée |
 | R17 | Disponibilité | Espace disque libre inférieur à 15 % (moins de 5 % : critique) | Élevée / critique |
+| R18 | Technique | ≥ 3 erreurs serveur sur une même route, ou 3 effets non exécutés d'une même commande, en 15 min, quel que soit le trafic | Élevée |
+| R19 | Sécurité | Action d'un administrateur de la plateforme depuis une IP jamais vue pour lui en 30 jours (connexions et actions) | Élevée |
+| R20 | Sécurité | ≥ 5 actions d'administration sensibles (suspension, annulation de paiement, tarif, montant par défaut, accès suspendu ou refusé) en 10 min par un même administrateur | Élevée |
 
 **Précisions de mise en œuvre** (décidées en écrivant les règles, chacune testée) :
 
@@ -251,8 +256,15 @@ Toutes les valeurs de seuil sont configurables ; celles-ci sont les valeurs init
 - **R14** : alimentée par l'émetteur de Vortex (404 et requêtes rejetées, avec l'adresse du navigateur), pas par le
   journal Nginx (voir § 3.2).
 - **R09** : un compte sans aucune connexion dans les 30 jours n'a pas d'habitudes et ne déclenche pas (nouveau compte).
+- **R18** : complète R04, qui raisonne en taux à partir de 20 requêtes en 5 min ; avec le trafic d'une PME, une route qui
+  échoue à chaque appel lui échappait. Clé : méthode et route (`app.error`) ou commande (`command.effect_failed`).
+- **R19** : l'historique d'adresses s'arrête 12 h avant l'action (durée maximale d'une session d'administration dans
+  Vortex), pour que la connexion qui ouvre la session suspecte ne rende pas son adresse « connue ». Un administrateur
+  sans historique ne déclenche pas. L'administrateur est identifié par l'empreinte de son adresse (`emailHash`).
+- **R20** : un paiement saisi, un inventaire ou un accès approuvé ne sont pas « sensibles » : seules les actions qui
+  coupent l'accès ou changent ce que paient les entreprises comptent.
 
-Les règles R07 et R09 sont des **règles de séquence** : elles relient des événements de natures différentes (sécurité puis
+Les règles R07, R09 et R19 sont des **règles de séquence** : elles relient des événements de natures différentes (sécurité puis
 sécurité, sécurité puis métier). C'est l'apport principal d'un SIEM par rapport à une supervision.
 
 ### 6.1 Fonctionnement du moteur
@@ -362,6 +374,9 @@ Un SIEM est une cible : il concentre des informations sensibles et on peut cherc
 - **Journal d'audit** (`operator_audit`, ajout seul) : connexions et refus, consultations de preuves et recherches
   d'événements (qui a vu quelles adresses IP), transitions et commentaires, gestion des comptes.
 - **Lecture seule sur Vortex** : Sentinel n'agit jamais sur Vortex.
+- **Application installée** : le service worker ne met en cache que les fichiers de l'interface (scripts, styles,
+  polices, icônes) et une page « Sentinel est injoignable ». Aucune réponse de l'API (adresses IP, preuves) n'est
+  conservée sur l'appareil ; hors ligne, rien de périmé n'est affiché. Pas de notification push : les emails suffisent.
 - **Intégrité des événements** : table en ajout seul. Perspective : chaînage des lots par empreinte pour détecter une
   suppression.
 - **Aveuglement détecté** : un arrêt de l'émetteur déclenche R02.
@@ -399,6 +414,12 @@ Scénarios rejoués sur un environnement de test avec des données fictives :
 | Certificat proche de l'expiration (date simulée) | R15 |
 | Serveur email injoignable | R16 |
 | Disque presque plein (seuil abaissé pour le test) | R17 |
+| Accès refusés répétés depuis une adresse | R08 |
+| Pertes de stock répétées sur un produit | R12 |
+| Opération de caisse à une heure inhabituelle | R13 |
+| Route en échec avec un trafic faible | R18 |
+| Administration depuis une adresse inconnue | R19 |
+| Rafale d'actions d'administration sensibles | R20 |
 | Activité normale sur une semaine simulée | Aucune (mesure des faux positifs) |
 
 Mesures : taux de détection, faux positifs, délai entre l'événement et l'alerte, impact de l'émetteur sur la latence de

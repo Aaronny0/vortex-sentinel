@@ -16,7 +16,7 @@ dans [evaluation-resultats.md](evaluation-resultats.md).
   créée puis supprimée ; aucune base contenant des données n'est touchée.
 - **Données** : entièrement fictives. Adresses IP de documentation (RFC 5737 : 192.0.2.0/24, 198.51.100.0/24,
   203.0.113.0/24), comptes et entreprises inventés, empreintes d'adresses calculées comme le fait Vortex.
-- **Temps simulé** : horloge injectée, avancée par pas. Le moteur de corrélation réel (`runEngineCycle`, les 17 règles)
+- **Temps simulé** : horloge injectée, avancée par pas. Le moteur de corrélation réel (`runEngineCycle`, les 20 règles)
   est exécuté à chaque pas : 30 s comme en production ; 1, 5 ou 10 minutes pour les scénarios qui couvrent plusieurs
   heures ou une semaine.
 - **Arrivée des événements** : un événement de Vortex arrive 5 s après avoir eu lieu (envoi par lots de l'émetteur) ;
@@ -31,7 +31,7 @@ dans [evaluation-resultats.md](evaluation-resultats.md).
 
 | Mesure | Résultat |
 |---|---|
-| Règles attendues détectées | 14 sur 14 (100 %) |
+| Règles attendues détectées | 20 sur 20 (100 %) |
 | Faux positifs | 0, dont 0 sur la semaine normale |
 | Délai de détection | médiane 90 s, maximum 300 s (R10, moteur à pas de 5 min dans ce scénario) |
 | Surcoût de la capture dans Vortex | ≈ 1 µs par requête réussie, ≈ 3 µs par requête refusée |

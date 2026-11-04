@@ -61,6 +61,19 @@ const metrics = (at: number, route: string, p95Ms: number, count: number, server
     outcome: 'success',
     attributes: { method: 'GET', route, windowStart: new Date(Math.floor(at / MINUTE) * MINUTE - MINUTE).toISOString(), windowSeconds: 60, count, serverErrors, clientErrors: 0, p50Ms: Math.round(p95Ms / 3), p95Ms, maxMs: p95Ms + 200 },
   });
+const denied = (at: number, ip: string, route: string) =>
+  make(at, { type: 'access.denied', category: 'security', outcome: 'failure', network: { ip, userAgent: 'Mozilla/5.0' }, http: { method: 'POST', route, status: 403, durationMs: 6 }, attributes: { code: 'FORBIDDEN' } });
+const serverError = (at: number, route: string) =>
+  make(at, { type: 'app.error', category: 'technical', outcome: 'failure', http: { method: 'POST', route, status: 500, durationMs: 45 }, attributes: { code: 'INTERNAL' } });
+const adminId = '3d2c1b0a-9f8e-4d7c-8b6a-5f4e3d2c1b09';
+const companies = ['21b9a0c8-3d7e-4f61-9a2b-5c4d3e2f1a05', '5a4b3c2d-1e0f-4a9b-8c7d-6e5f4a3b2c01', '9e8d7c6b-5a49-4382-9716-a5b4c3d2e1f0'];
+const adminLogin = (at: number, ip: string) =>
+  make(at, { type: 'auth.login', category: 'security', outcome: 'success', actor: { emailHash: hash('admin@vortex.example') }, network: { ip, userAgent: 'Mozilla/5.0' }, attributes: { method: 'otp' } });
+const adminAction = (at: number, action: string, ip: string, company = companies[0]!) =>
+  make(at, { type: 'admin.action', category: 'security', outcome: 'success', actor: { adminId, emailHash: hash('admin@vortex.example') }, tenant: { organizationId: company }, network: { ip, userAgent: 'Mozilla/5.0' }, attributes: { action } });
+/** Habitudes de l'administrateur sur le mois précédent : connexion et un paiement saisi chaque matin, depuis le bureau. */
+const adminHabits = (t0: number) =>
+  Array.from({ length: 20 }, (_, day) => [adminLogin(t0 - (day + 1) * DAY - 60 * MINUTE, '203.0.113.20'), adminAction(t0 - (day + 1) * DAY - 50 * MINUTE, 'subscription.payment', '203.0.113.20')]).flat();
 const notFound = (at: number, ip: string) => make(at, { type: 'http.access', category: 'technical', outcome: 'failure', network: { ip }, http: { method: 'GET', route: '/*', status: 404, durationMs: 2 } });
 const mailFailed = (at: number) => make(at, { type: 'mail.failed', category: 'availability', outcome: 'failure', attributes: { kind: 'link' } });
 const disk = (at: number, freePercent: number) => make(at, { type: 'host.disk', category: 'availability', outcome: 'success', attributes: { path: '/', freePercent, freeBytes: freePercent * 1e9, totalBytes: 100e9 } }, 'sentinel-probe');
@@ -199,6 +212,87 @@ export const scenarios: Scenario[] = [
     events: (t0) => [...background(t0, 6 * MINUTE), disk(t0 - 5 * MINUTE, 41), disk(t0, 9)],
   },
   {
+    id: 'S14',
+    name: "Recherche de droits : accès refusés répétés",
+    expected: ['R08'],
+    conditionMetAt: { R08: 4 * 40 * SECOND },
+    durationMs: 8 * MINUTE,
+    events: (t0) => [
+      ...background(t0, 8 * MINUTE),
+      ...Array.from({ length: 7 }, (_, i) => denied(t0 + i * 40 * SECOND, '198.51.100.40', ['/api/v1/commands/:type', '/api/v1/admin/organizations', '/api/v1/workspace'][i % 3]!)),
+    ],
+  },
+  {
+    id: 'S15',
+    name: 'Pertes de stock répétées sur un produit',
+    expected: ['R12'],
+    conditionMetAt: { R12: 10 * MINUTE },
+    durationMs: 30 * MINUTE,
+    stepMs: MINUTE,
+    events: (t0) => [
+      ...background(t0, 0),
+      business(t0 - 5 * DAY, 'stock.adjust', members[2]!, { quantity: -2, subjectId: '4d5e6f7a-8b9c-4d0e-9f1a-3b4c5d6e7f08' }),
+      business(t0 - 2 * DAY, 'stock.adjust', members[2]!, { quantity: -1, subjectId: '4d5e6f7a-8b9c-4d0e-9f1a-3b4c5d6e7f08' }),
+      business(t0 + 10 * MINUTE, 'stock.adjust', members[2]!, { quantity: -3, subjectId: '4d5e6f7a-8b9c-4d0e-9f1a-3b4c5d6e7f08' }),
+    ],
+  },
+  {
+    id: 'S16',
+    name: 'Opération de caisse à une heure inhabituelle',
+    expected: ['R13'],
+    conditionMetAt: { R13: 5 * MINUTE },
+    durationMs: 20 * MINUTE,
+    stepMs: MINUTE,
+    events: (t0) => [
+      ...background(t0, 0),
+      // Un mois d'ouvertures à 8 h et de clôtures à 17 h (UTC) ; le mouvement de caisse a lieu à 10 h 05.
+      ...Array.from({ length: 30 }, (_, day) => [
+        business(t0 - (day + 1) * DAY - 2 * HOUR, 'cash.open', members[1]!),
+        business(t0 - (day + 1) * DAY + 7 * HOUR, 'cash.close', members[1]!),
+      ]).flat(),
+      business(t0 + 5 * MINUTE, 'cash.movement', members[1]!),
+    ],
+  },
+  {
+    id: 'S17',
+    name: "Fonctionnalité en panne, trafic faible",
+    expected: ['R18'],
+    conditionMetAt: { R18: 4 * MINUTE },
+    durationMs: 10 * MINUTE,
+    events: (t0) => [
+      ...background(t0, 10 * MINUTE),
+      // Trafic de PME : 3 requêtes par minute, moins des 20 requêtes en 5 min qu'attend R04 (taux) : seule R18 le voit.
+      ...Array.from({ length: 10 }, (_, i) => metrics(t0 + (i + 1) * MINUTE, '/api/v1/documents', 180, 3, i % 2 ? 0 : 1)),
+      ...Array.from({ length: 4 }, (_, i) => serverError(t0 + i * 2 * MINUTE, '/api/v1/documents')),
+    ],
+  },
+  {
+    id: 'S18',
+    name: "Administration depuis une adresse inconnue",
+    expected: ['R19'],
+    conditionMetAt: { R19: 6 * MINUTE },
+    durationMs: 12 * MINUTE,
+    events: (t0) => [
+      ...background(t0, 12 * MINUTE),
+      ...adminHabits(t0),
+      adminLogin(t0 + 2 * MINUTE, '192.0.2.200'),
+      adminAction(t0 + 6 * MINUTE, 'subscription.tariff', '192.0.2.200', companies[1]),
+    ],
+  },
+  {
+    id: 'S19',
+    name: "Rafale d'actions d'administration sensibles",
+    expected: ['R20'],
+    conditionMetAt: { R20: 4 * 45 * SECOND },
+    durationMs: 10 * MINUTE,
+    events: (t0) => [
+      ...background(t0, 10 * MINUTE),
+      ...adminHabits(t0),
+      adminLogin(t0 - 10 * MINUTE, '203.0.113.20'),
+      ...Array.from({ length: 6 }, (_, i) => adminAction(t0 + i * 45 * SECOND, i % 2 ? 'subscription.payment_cancel' : 'subscription.suspend', '203.0.113.20', companies[i % 3])),
+    ],
+  },
+  {
     id: 'S13',
     name: 'Activité normale pendant une semaine',
     expected: [],
@@ -218,6 +312,9 @@ export const scenarios: Scenario[] = [
         for (let sale = 0; sale < 12; sale += 1) events.push(business(morning + HOUR + sale * 35 * MINUTE, 'sale.create', members[sale % 2]!, { amount: 60_000 + sale * 5_000, quantity: 1 }));
         if (day % 2 === 0) events.push(business(morning + 5 * HOUR, 'sale.refund', members[day % 3 === 0 ? 0 : 1]!, { amount: 30_000 }));
         events.push(business(morning + 9 * HOUR, 'cash.close', members[1]!, { amount: day === -20 ? -400 : day % 4 === 0 ? 300 : 0 }));
+        // L'administrateur de la plateforme : connexion, paiements saisis, une suspension tous les quatre jours (R19, R20).
+        events.push(adminLogin(morning + 30 * MINUTE, '203.0.113.20'), adminAction(morning + 40 * MINUTE, 'subscription.payment', '203.0.113.20', companies[day % 3 === 0 ? 1 : 0]));
+        if (day % 4 === 0) events.push(adminAction(morning + 50 * MINUTE, 'subscription.suspend', '203.0.113.20', companies[2]));
         if (day % 5 === 0) events.push(business(morning + 6 * HOUR, 'stock.adjust', members[2]!, { amount: 25_000, quantity: 1, subjectId: '4d5e6f7a-8b9c-4d0e-9f1a-3b4c5d6e7f08' }));
         if (day >= 0) {
           for (let hour = 0; hour < 24; hour += 1) {
@@ -226,6 +323,9 @@ export const scenarios: Scenario[] = [
             if (hour >= 8 && hour < 18) events.push(metrics(at + 30 * MINUTE, '/api/v1/workspace', 320, 90, hour === 12 ? 1 : 0));
           }
           events.push(notFound(t0 + day * DAY + 14 * HOUR, '203.0.113.11'), certificate(t0 + day * DAY + 3 * HOUR, t0 + 75 * DAY));
+          // Erreurs isolées (une par jour, deux le mercredi sur des routes différentes) : rien pour R18.
+          events.push(serverError(t0 + day * DAY + 15 * HOUR, '/api/v1/documents'));
+          if (day === 2) events.push(serverError(t0 + day * DAY + 15 * HOUR + 5 * MINUTE, '/api/v1/sales'));
         }
       }
       return events;

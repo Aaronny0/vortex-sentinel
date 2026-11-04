@@ -41,4 +41,17 @@ export const exampleEvents = {
     http: { method: 'GET', route: '/api/v1/health', status: 503, durationMs: 41 },
     attributes: { target: 'vortex-api', code: 'DATABASE_UNAVAILABLE' },
   },
+  adminAction: {
+    id: '6f1e2d3c-4b5a-4968-8776-a5b4c3d2e108',
+    schemaVersion: 1,
+    occurredAt: '2026-11-03T21:47:02.000Z',
+    source: 'vortex-api',
+    category: 'security',
+    type: 'admin.action',
+    outcome: 'success',
+    actor: { adminId: '3d2c1b0a-9f8e-4d7c-8b6a-5f4e3d2c1b09', emailHash: 'b4e2d3c5f6a70819304b5c6d7e8f9a01b2c3d4e5f60718293a4b5c6d7e8f9a01' },
+    tenant: { organizationId: '21b9a0c8-3d7e-4f61-9a2b-5c4d3e2f1a05' },
+    network: { ip: '198.51.100.23', userAgent: 'Mozilla/5.0' },
+    attributes: { action: 'subscription.suspend' },
+  },
 } satisfies Record<string, EventInput>;

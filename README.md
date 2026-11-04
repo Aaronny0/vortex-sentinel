@@ -14,13 +14,13 @@ collecte → normalisation → corrélation → alerte → incident
 | Mission | Réalisation |
 |---|---|
 | Disponibilité | Sondes de santé (30 s), certificat TLS (1 jour), disque (5 min) ; R01, R02, R15, R17 |
-| Supervision technique | Temps de réponse et erreurs par route et par minute, emails en échec ; R03, R04, R16 |
-| Sécurité | Force brute, bourrage d'identifiants, compromission, refus d'accès, exploration de l'API, nouvelle adresse puis changement sensible ; R05 à R09, R14 |
+| Supervision technique | Temps de réponse et erreurs par route et par minute, emails en échec, fonctionnalité en panne ; R03, R04, R16, R18 |
+| Sécurité | Force brute, bourrage d'identifiants, compromission, refus d'accès, exploration de l'API, nouvelle adresse puis changement sensible, administration depuis une adresse inconnue ou en rafale ; R05 à R09, R14, R19, R20 |
 | Anomalies métier | Remboursements, écarts de caisse, pertes de stock, opérations hors horaires ; R10 à R13 |
-| Corrélation et alertes | 17 règles rejouables, une alerte par constat, gravités Info à Critique |
-| Gestion des incidents | Regroupement, cycle de vie historisé, notifications email, tableau de bord |
+| Corrélation et alertes | 20 règles rejouables, une alerte par constat, gravités Info à Critique |
+| Gestion des incidents | Regroupement, cycle de vie historisé, notifications email, tableau de bord installable (PWA) |
 
-Évaluation : 14 détections sur 14 scénarios, 0 faux positif sur une semaine simulée, délai médian 90 s
+Évaluation : 20 détections sur 20 attendues (19 scénarios), 0 faux positif sur une semaine simulée, délai médian 90 s
 ([docs/evaluation.md](docs/evaluation.md)).
 
 ## Organisation
