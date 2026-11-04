@@ -277,3 +277,20 @@ describe('R04 : taux d’erreurs serveur', () => {
     expect(await run(r04ServerErrors)).toMatchObject({ findings: 0 });
   });
 });
+
+describe('rejeu', () => {
+  test('rejoue une attaque passée : mêmes constats que le moteur, rien d’écrit', async () => {
+    const { replay } = await import('../src/engine/replay.ts');
+    await series(10, () => login('failure', 'awa', '198.51.100.9'), before(20 * MINUTE_MS), 20 * SECOND);
+    await receive(login('success', 'awa', '198.51.100.9'), before(15 * MINUTE_MS));
+    const from = new Date(clock.now().getTime() - 40 * MINUTE_MS);
+    const findings = await replay(db.appPool, [r05AccountBruteForce, r07Compromise], { from, to: clock.now(), stepSeconds: 60 });
+    expect(findings.map((finding) => [finding.ruleId, finding.severity, finding.key])).toEqual([
+      ['R05', 'high', hash('awa')],
+      ['R07', 'critical', hash('awa')],
+    ]);
+    expect(findings[0]!.firstAt.getTime()).toBeLessThan(findings[1]!.firstAt.getTime());
+    expect(await alerts()).toEqual([]);
+    expect(Number((await db.admin.query('SELECT count(*) FROM sentinel.rule_checkpoint')).rows[0].count)).toBe(0);
+  });
+});

@@ -5,6 +5,7 @@ import { loadEnv } from './config/env.ts';
 import { every } from './common/loop.ts';
 import { createPool, ensurePartitions } from './db/pools.ts';
 import { ENGINE_INTERVAL_MS, runEngineCycle } from './engine/engine.ts';
+import { purgeExpired } from './db/retention.ts';
 import { MAX_INGEST_BYTES } from './ingest/ingest-plugin.ts';
 import { createProbes, startProbes } from './probes/runner.ts';
 import { rules } from './rules/registry.ts';
@@ -43,12 +44,22 @@ const engine = every(
 );
 console.log(`Moteur de corrélation : ${rules.length} règles (${rules.map((rule) => rule.id).join(', ')})`);
 
+// Rétention : chaque jour, partitions de plus de 2 ans et clés de déduplication de plus de 30 jours.
+const retention = every(
+  DAY_MS,
+  async () => {
+    const result = await purgeExpired(appPool, clock);
+    if (result.droppedPartitions) console.log(`Rétention : ${result.droppedPartitions} partition(s) supprimée(s)`);
+  },
+  (error) => logError('Rétention :', error),
+);
+
 let stopping = false;
 const stop = async () => {
   if (stopping) return;
   stopping = true;
   clearInterval(partitions);
-  await Promise.all([...probeLoops, engine].map((loop) => loop.stop()));
+  await Promise.all([...probeLoops, engine, retention].map((loop) => loop.stop()));
   await app.stop();
   await Promise.all([ingestPool.end(), appPool.end()]);
   process.exit(0);

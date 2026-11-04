@@ -150,6 +150,39 @@ describe('ingestion : refus', () => {
   });
 });
 
+describe('ingestion : débit', () => {
+  test('au-delà du débit autorisé : 429 avec Retry-After, rien d’enregistré ; la minute suivante repasse', async () => {
+    clock.set('2026-11-03T14:40:00.000Z');
+    const local = createApp({ ingestPool: db.ingestPool, appPool: db.appPool, clock, secrets: [secret], operatorSecretKey: Buffer.alloc(32, 7), dashboardOrigin: 'http://sentinel.test', ingestRate: { batchesPerMinute: 2, eventsPerMinute: 1_000 } });
+    const post = async () => {
+      clock.advance(1000);
+      const response = await local.handle(signedRequest(batch([event()])));
+      return { status: response.status, retryAfter: response.headers.get('retry-after') };
+    };
+    expect((await post()).status).toBe(202);
+    expect((await post()).status).toBe(202);
+    expect(await post()).toEqual({ status: 429, retryAfter: '57' });
+    expect(await countEvents()).toBe(2);
+    clock.advance(60_000);
+    expect((await post()).status).toBe(202);
+  });
+});
+
+describe('santé de Sentinel', () => {
+  test('moteur à jour : ok ; sans cycle depuis plus de 2 min : dégradée (503)', async () => {
+    const health = async () => {
+      const response = await app.handle(new Request('http://sentinel.test/health'));
+      return { status: response.status, body: (await response.json()) as { status: string; engine: { lagSeconds: number | null } } };
+    };
+    await db.admin.query('TRUNCATE sentinel.rule_checkpoint');
+    expect(await health()).toMatchObject({ status: 200, body: { status: 'ok', engine: { lagSeconds: null } } });
+    await db.admin.query(`INSERT INTO sentinel.rule_checkpoint VALUES ('R01', $1, $1)`, [new Date(clock.now().getTime() - 30_000)]);
+    expect(await health()).toMatchObject({ status: 200, body: { status: 'ok', engine: { lagSeconds: 30 } } });
+    clock.advance(120_000);
+    expect(await health()).toMatchObject({ status: 503, body: { status: 'degraded' } });
+  });
+});
+
 describe('ingestion : concurrence', () => {
   test('deux lots simultanés portant les mêmes événements ne les enregistrent qu’une fois', async () => {
     const events = Array.from({ length: 50 }, () => event());

@@ -99,7 +99,8 @@ Ordre de traitement, chaque étape refusant avant la suivante :
 
 - La mémoire anti-rejeu est locale au processus : un redémarrage la vide, la fenêtre d'horodatage et la déduplication
   par identifiant restent alors les garde-fous.
-- Débit borné par source ; au-delà, 429 avec `Retry-After` (à venir, pas encore implémenté).
+- Débit borné après authentification (`INGEST_RATE` : 120 lots et 30 000 événements par minute) ; au-delà, 429 avec
+  `Retry-After`, et l'émetteur réessaie : rien n'est perdu en silence.
 - Le corps reçu n'est jamais écrit dans les journaux.
 
 ## 4 bis. Sondes
@@ -219,7 +220,10 @@ Sentinel publie sa propre santé, et ses retards sont des incidents comme les au
 - `GET /health` : base joignable, dernier cycle du moteur, retard d'ingestion.
 - Mesures internes : délai entre `received_at` et l'évaluation, durée de chaque cycle par règle, événements refusés par
   motif, abandons signalés par l'émetteur.
-- Un cycle de moteur en retard de plus de 2 minutes ouvre une alerte « Moteur de corrélation en retard ».
+- Un moteur sans cycle depuis plus de 2 minutes rend `GET /health` « dégradé » (503) : une sonde externe le voit même
+  quand Sentinel ne peut plus alerter lui-même (perspective : sonde sur une seconde machine, voir conception § 3.2).
+- Rétention quotidienne (`sentinel.purge_expired`) : partitions de plus de 2 ans, clés de déduplication de plus de
+  30 jours. Les durées sont dans la fonction SQL ; elle refuse une date dans le futur.
 
 ## 8. Émetteur (dans le dépôt Vortex)
 

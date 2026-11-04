@@ -26,8 +26,19 @@ function fieldsOf(issues: readonly { path: PropertyKey[]; message: string }[]): 
  * POST /ingest. Ordre fixe, chaque étape refuse avant la suivante (docs/backend.md § 4) : taille, horodatage et signature
  * sur le corps brut, rejeu, JSON, schéma (lot entier refusé), enregistrement. Le corps n'est jamais journalisé.
  */
-export const ingestPlugin = (deps: { pool: Pool; clock: Clock; secrets: readonly string[]; replayGuard: ReplayGuard }) =>
-  new Elysia({ name: 'ingest' }).post(
+/**
+ * Débit maximal accepté par minute, après authentification (un émetteur normal envoie un lot toutes les 5 s) : au-delà,
+ * 429 avec Retry-After, et l'émetteur garde ses événements pour plus tard. Protège la base d'un émetteur emballé ou
+ * d'un secret volé, sans jamais perdre en silence : chaque lot refusé est réessayé.
+ */
+export const INGEST_RATE: { batchesPerMinute: number; eventsPerMinute: number } = { batchesPerMinute: 120, eventsPerMinute: 30_000 };
+
+export const ingestPlugin = (deps: { pool: Pool; clock: Clock; secrets: readonly string[]; replayGuard: ReplayGuard; rate?: typeof INGEST_RATE }) => {
+  const rate = deps.rate ?? INGEST_RATE;
+  let minute = -1;
+  let batches = 0;
+  let events = 0;
+  return new Elysia({ name: 'ingest' }).post(
     '/ingest',
     async ({ request, set }) => {
       const declared = Number(request.headers.get('content-length') ?? 0);
@@ -39,6 +50,13 @@ export const ingestPlugin = (deps: { pool: Pool; clock: Clock; secrets: readonly
       const signature = request.headers.get(SIGNATURE_HEADER);
       verifySignature({ secrets: deps.secrets, timestamp: request.headers.get(TIMESTAMP_HEADER), signature, body: raw, now });
       if (!deps.replayGuard.firstSeen(signature!, now)) throw new AppError(401, 'REPLAYED', 'Requête déjà reçue.');
+      const current = Math.floor(now.getTime() / 60_000);
+      if (current !== minute) [minute, batches, events] = [current, 0, 0];
+      if (batches >= rate.batchesPerMinute || events >= rate.eventsPerMinute) {
+        set.headers['retry-after'] = String(60 - Math.floor((now.getTime() / 1000) % 60));
+        throw new AppError(429, 'RATE_LIMITED', 'Débit trop élevé : réessayez plus tard.');
+      }
+      batches += 1;
 
       let json: unknown;
       try {
@@ -49,9 +67,11 @@ export const ingestPlugin = (deps: { pool: Pool; clock: Clock; secrets: readonly
       const batch = eventBatchSchema.safeParse(json);
       if (!batch.success) throw new AppError(422, 'VALIDATION_FAILED', 'Lot refusé : certains événements sont invalides.', fieldsOf(batch.error.issues));
 
+      events += batch.data.events.length;
       const result = await storeBatch(deps.pool, batch.data.events, now);
       set.status = 202;
       return result;
     },
     { parse: 'none' },
   );
+};
