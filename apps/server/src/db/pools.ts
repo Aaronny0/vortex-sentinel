@@ -2,9 +2,15 @@ import { Pool } from 'pg';
 import type { Clock } from '../common/clock.ts';
 import { logError } from '../common/safe-log.ts';
 
+/**
+ * Sessions en UTC : sinon « 30 jours » se compte dans le fuseau du serveur, et un changement d'heure élargit ou rétrécit
+ * les fenêtres des règles d'une heure.
+ */
+export const UTC_SESSION = '-c timezone=UTC';
+
 /** Un pool par rôle : chaque processus se connecte avec le login qui n'a que les droits de sa tâche. */
 export function createPool(connectionString: string, applicationName: string, max = 10): Pool {
-  const pool = new Pool({ connectionString, application_name: applicationName, max, connectionTimeoutMillis: 10_000 });
+  const pool = new Pool({ connectionString, application_name: applicationName, max, connectionTimeoutMillis: 10_000, options: UTC_SESSION });
   pool.on('error', (error) => logError('Connexion PostgreSQL :', error));
   return pool;
 }

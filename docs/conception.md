@@ -242,6 +242,12 @@ Toutes les valeurs de seuil sont configurables ; celles-ci sont les valeurs init
   l'heure de l'événement.
 - **R08** : la capture HTTP de Vortex ne connaît pas l'utilisateur d'une requête refusée ; l'acteur est l'utilisateur
   quand il est connu, sinon le compte, sinon l'adresse IP.
+- **R10** : fenêtre glissante de 24 h (Sentinel ne connaît pas le fuseau de chaque boutique) ; moyenne sur les 30 jours
+  précédents.
+- **R11** : écart au-delà de 10 000 unités de la devise (moyenne) ; 3 manques en 30 jours pour un même membre (élevée).
+- **R12** : le produit est identifié par l'identifiant que Vortex envoie (`attributes.subjectId`), sans nom ni modèle.
+- **R13** : heure (UTC) où la boutique fait moins de 1 % de son activité des 30 jours, à partir de 50 opérations
+  d'historique. Gravité faible : alerte sans incident.
 - **R14** : alimentée par l'émetteur de Vortex (404 et requêtes rejetées, avec l'adresse du navigateur), pas par le
   journal Nginx (voir § 3.2).
 - **R09** : un compte sans aucune connexion dans les 30 jours n'a pas d'habitudes et ne déclenche pas (nouveau compte).
@@ -254,8 +260,9 @@ sécurité, sécurité puis métier). C'est l'apport principal d'un SIEM par rap
 - **Règles unitaires** (R11 sur un écart, R13) : évaluées dès l'ingestion de l'événement.
 - **Règles de seuil et de séquence** : requêtes SQL sur fenêtre glissante, exécutées toutes les 30 s à partir du dernier
   point traité (pas de relecture complète).
-- **Références comportementales** (R09, R10, R13) : statistiques par acteur et par boutique recalculées chaque nuit
-  (moyennes sur 30 jours, IP connues, horaires habituels).
+- **Références comportementales** (R09, R10, R13) : calculées à la volée sur 30 jours bornés et indexés (moyennes,
+  IP connues, horaires habituels), plutôt que dans une table recalculée chaque nuit : même événements, même résultat,
+  rien à maintenir. Une table `baseline` deviendrait utile si le volume l'exigeait.
 - **Déduplication** : une alerte est identifiée par (règle, clé), par exemple (R05, compte). Tant qu'elle est ouverte,
   les nouveaux déclenchements incrémentent son compteur au lieu de créer une nouvelle alerte.
 

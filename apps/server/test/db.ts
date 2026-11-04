@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { Client, Pool } from 'pg';
 import { migrate } from '../src/db/migrate.ts';
+import { UTC_SESSION } from '../src/db/pools.ts';
 
 /**
  * Base jetable par suite de tests : créée, migrée, puis supprimée. Connexion d'administration (CREATEDB et CREATEROLE) :
@@ -33,7 +34,7 @@ export async function createTestDb(): Promise<TestDb> {
   await server.connect();
   await server.query(`CREATE DATABASE ${name}`);
 
-  const admin = new Client({ connectionString: withDatabase(ADMIN_URL, name) });
+  const admin = new Client({ connectionString: withDatabase(ADMIN_URL, name), options: UTC_SESSION });
   await admin.connect();
   await migrate(admin);
 
@@ -48,8 +49,8 @@ export async function createTestDb(): Promise<TestDb> {
   }
 
   const loginUrl = (kind: keyof typeof LOGINS) => `postgresql://${LOGINS[kind]}:${passwords[kind]}@${LOGIN_HOST}/${name}`;
-  const ingestPool = new Pool({ connectionString: loginUrl('ingest'), max: 4 });
-  const appPool = new Pool({ connectionString: loginUrl('app'), max: 2 });
+  const ingestPool = new Pool({ connectionString: loginUrl('ingest'), max: 4, options: UTC_SESSION });
+  const appPool = new Pool({ connectionString: loginUrl('app'), max: 2, options: UTC_SESSION });
 
   return {
     name,

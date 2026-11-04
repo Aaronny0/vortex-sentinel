@@ -164,6 +164,9 @@ moteur s'occupe du reste. Une règle est donc testable seule, avec des événeme
 - Événement arrivé après ce délai : il est enregistré, et réévalué au cycle suivant à partir du point de reprise ;
   l'éventuelle alerte rejoint l'alerte existante grâce à la déduplication.
 - Toutes les dates sont en UTC dans le code et en base (`timestamptz`) ; le fuseau n'intervient qu'à l'affichage.
+- Les connexions PostgreSQL ouvrent leur session en UTC (`-c timezone=UTC`) : sinon `interval '30 days'` se compte
+  dans le fuseau du serveur et un changement d'heure décale d'une heure les fenêtres en jours (défaut trouvé par les
+  tests de R11).
 
 ### 5.3 Exactement une alerte par constat
 
@@ -193,9 +196,10 @@ moteur s'occupe du reste. Une règle est donc testable seule, avec des événeme
 
 ### 5.5 Références comportementales
 
-Recalculées chaque nuit dans une transaction (`baseline`) : moyennes sur 30 jours par acteur, IP connues par utilisateur,
-plages horaires d'activité par boutique. Une règle qui en dépend lit la dernière version complète, jamais un calcul en
-cours.
+Calculées à la volée dans la requête de la règle, sur 30 jours bornés et indexés (moyennes par membre, adresses connues
+d'un compte, heures d'activité d'une boutique). Une règle reste ainsi une fonction des seuls événements, rejouable à
+l'identique. Une table de références recalculée chaque nuit ne se justifierait que si le volume rendait ces requêtes
+trop lentes.
 
 ## 6. Horloge, configuration, erreurs, journaux
 
