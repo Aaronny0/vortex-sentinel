@@ -10,6 +10,7 @@ export const r01ProbeDown: Rule = {
   id: 'R01',
   version: 1,
   kind: 'state',
+  autoResolve: true,
   severity: 'critical',
   graceMs: 0,
   quietMs: 2 * MINUTE_MS,

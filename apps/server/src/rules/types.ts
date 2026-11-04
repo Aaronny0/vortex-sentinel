@@ -30,6 +30,8 @@ export type Rule = {
   graceMs: number;
   /** Sans nouveau constat pendant cette durée, l'alerte est close ; un constat ultérieur en ouvre une nouvelle. */
   quietMs: number;
+  /** Règle de disponibilité : son incident se résout seul quand toutes ses alertes sont closes (service rétabli). */
+  autoResolve?: boolean;
   /** Seuils effectifs, conservés avec chaque alerte. */
   thresholds: Record<string, number>;
   evaluate(ctx: RuleContext): Promise<Finding[]>;

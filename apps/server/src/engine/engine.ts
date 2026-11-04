@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod';
 import type { Clock } from '../common/clock.ts';
+import { autoResolveIncidents, linkAlertToIncident } from '../incidents/link.ts';
 import { severities, type Finding, type Rule } from '../rules/types.ts';
 
 /** Espace des verrous consultatifs du moteur (« SENT ») : la seconde clé est l'empreinte de l'identifiant de règle. */
@@ -17,7 +18,7 @@ const findingSchema = z.strictObject({
 });
 
 export type RuleRun =
-  | { status: 'evaluated'; at: Date; findings: number; opened: number; closed: number }
+  | { status: 'evaluated'; at: Date; findings: number; opened: number; closed: number; incidentsOpened: number; incidentsResolved: number }
   | { status: 'skipped'; reason: 'locked' | 'up_to_date' };
 
 /**
@@ -46,20 +47,27 @@ export async function runRule(pool: Pool, rule: Rule, clock: Clock): Promise<Rul
       findingSchema.parse(finding),
     );
     let opened = 0;
-    for (const finding of findings) if (await recordFinding(client, rule, finding, at)) opened += 1;
+    let incidentsOpened = 0;
+    for (const finding of findings) {
+      const alert = await recordFinding(client, rule, finding, at);
+      if (alert.opened) opened += 1;
+      const incident = await linkAlertToIncident(client, { id: alert.id, ruleId: rule.id, key: finding.key, severity: alert.severity, summary: finding.summary }, at);
+      if (incident?.opened) incidentsOpened += 1;
+    }
 
     const { rowCount: closed } = await client.query(
       `UPDATE sentinel.alert SET status = 'closed', closed_at = $2
        WHERE rule_id = $1 AND status = 'open' AND last_seen_at < $2::timestamptz - make_interval(secs => $3)`,
       [rule.id, at, rule.quietMs / 1000],
     );
+    const incidentsResolved = closed ? await autoResolveIncidents(client, rule.id, at) : 0;
     await client.query(
       `INSERT INTO sentinel.rule_checkpoint (rule_id, evaluated_to, updated_at) VALUES ($1, $2, $3)
        ON CONFLICT (rule_id) DO UPDATE SET evaluated_to = EXCLUDED.evaluated_to, updated_at = EXCLUDED.updated_at`,
       [rule.id, at, clock.now()],
     );
     await client.query('COMMIT');
-    return { status: 'evaluated', at, findings: findings.length, opened, closed: closed ?? 0 };
+    return { status: 'evaluated', at, findings: findings.length, opened, closed: closed ?? 0, incidentsOpened, incidentsResolved };
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined);
     throw error;
@@ -70,12 +78,13 @@ export async function runRule(pool: Pool, rule: Rule, clock: Clock): Promise<Rul
 
 /**
  * Ouvre une alerte, ou rejoint l'alerte ouverte de même règle et même clé : compteur incrémenté, gravité portée au plus
- * haut, résumé actualisé, nouvelles preuves ajoutées après les premières. Renvoie vrai si l'alerte est nouvelle.
+ * haut, résumé actualisé, nouvelles preuves ajoutées après les premières. Renvoie l'alerte, sa gravité actuelle, et si
+ * elle est nouvelle.
  */
-async function recordFinding(client: PoolClient, rule: Rule, finding: Finding, at: Date): Promise<boolean> {
-  const { rows } = await client.query<{ opened: boolean }>(
-    `INSERT INTO sentinel.alert (rule_id, rule_version, key, severity, summary, evidence, thresholds, first_seen_at, last_seen_at)
-     VALUES ($1, $2, $3, $4, $5, $6::uuid[], $7, $8, $8)
+async function recordFinding(client: PoolClient, rule: Rule, finding: Finding, at: Date) {
+  const { rows } = await client.query<{ id: string; severity: Finding['severity']; opened: boolean }>(
+    `INSERT INTO sentinel.alert (rule_id, rule_version, key, severity, summary, evidence, thresholds, first_seen_at, last_seen_at, auto_resolve)
+     VALUES ($1, $2, $3, $4, $5, $6::uuid[], $7, $8, $8, $11)
      ON CONFLICT (rule_id, key) WHERE status = 'open' DO UPDATE SET
        hits = alert.hits + 1,
        last_seen_at = EXCLUDED.last_seen_at,
@@ -83,10 +92,10 @@ async function recordFinding(client: PoolClient, rule: Rule, finding: Finding, a
        severity = CASE WHEN array_position($9::text[], EXCLUDED.severity) > array_position($9::text[], alert.severity)
                        THEN EXCLUDED.severity ELSE alert.severity END,
        evidence = (alert.evidence || ARRAY(SELECT id FROM unnest(EXCLUDED.evidence) AS id WHERE id <> ALL (alert.evidence)))[1:$10]
-     RETURNING (xmax = 0) AS opened`,
-    [rule.id, rule.version, finding.key, finding.severity, finding.summary, finding.evidence, rule.thresholds, at, severities, MAX_EVIDENCE],
+     RETURNING id, severity, (xmax = 0) AS opened`,
+    [rule.id, rule.version, finding.key, finding.severity, finding.summary, finding.evidence, rule.thresholds, at, severities, MAX_EVIDENCE, rule.autoResolve ?? false],
   );
-  return rows[0]?.opened ?? false;
+  return rows[0]!;
 }
 
 /** Un cycle : chaque règle à son tour. L'échec d'une règle est signalé et n'empêche pas les autres d'être évaluées. */

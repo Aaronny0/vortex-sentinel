@@ -299,6 +299,20 @@ stateDiagram-v2
 Chaque transition est historisée (auteur, date, commentaire). Les faux positifs sont comptés par règle pour le calibrage
 et l'évaluation.
 
+**Mise en œuvre** (`apps/server/src/incidents`) :
+
+- L'incident est ouvert ou alimenté **dans la transaction de l'alerte** : l'un n'existe jamais sans l'autre. Un index
+  unique sur les incidents actifs par clé garantit un seul incident même quand deux règles constatent la même clé au
+  même instant.
+- Référence lisible `INC-000042`. Titre : la règle et le résumé de la première alerte.
+- Résolution automatique : seulement pour un incident encore *Ouvert* dont toutes les alertes sont closes et viennent
+  de règles de disponibilité (R01, R02, R15, R17). Un incident pris en charge, ou qui contient une alerte de sécurité,
+  attend une décision humaine.
+- Commentaire obligatoire pour *Résolu*, *Faux positif* et la réouverture. Deux opérateurs qui agissent en même temps
+  sont traités l'un après l'autre (verrou de ligne) ; le second voit le nouveau statut.
+- L'historique (`incident_history`) est en ajout seul pour tous les rôles : ouverture, alerte rattachée, gravité
+  relevée, transitions, commentaires.
+
 ## 8. Modèle de données Sentinel
 
 | Table | Contenu |

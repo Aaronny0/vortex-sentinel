@@ -11,6 +11,7 @@ export const r02HeartbeatLost: Rule = {
   id: 'R02',
   version: 1,
   kind: 'state',
+  autoResolve: true,
   severity: 'high',
   // Les battements arrivent par lots de l'émetteur : on laisse aux lots en retard le temps d'arriver.
   graceMs: MINUTE_MS,

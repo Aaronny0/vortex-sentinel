@@ -10,6 +10,7 @@ export const r15CertificateExpiry: Rule = {
   id: 'R15',
   version: 1,
   kind: 'state',
+  autoResolve: true,
   severity: 'medium',
   graceMs: 0,
   quietMs: 2 * MINUTE_MS,

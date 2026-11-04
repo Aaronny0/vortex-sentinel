@@ -7,6 +7,7 @@ export const r17DiskSpace: Rule = {
   id: 'R17',
   version: 1,
   kind: 'state',
+  autoResolve: true,
   severity: 'high',
   graceMs: 0,
   quietMs: 2 * MINUTE_MS,
