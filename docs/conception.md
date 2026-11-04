@@ -83,6 +83,10 @@ Un module ajouté à `apps/api` (dans le dépôt Vortex) :
 - **agrégation** des requêtes réussies par minute et par route (nombre, latence p50/p95) : chaque requête n'est pas
   envoyée individuellement, seules les erreurs et les requêtes lentes le sont.
 
+**État** : réalisé dans `apps/api/src/sentinel` de Vortex (branche `feat/sentinel-emitter`, à fusionner). Désactivé
+tant que `SENTINEL_URL`, `SENTINEL_SECRET` et `SENTINEL_HASH_KEY` ne sont pas définies ensemble. La connexion refusée
+est signalée par Better Auth (`auth.login`) et non par la capture HTTP, qui n'a pas l'empreinte du compte visé.
+
 ### 3.2 Côté Sentinel
 
 | Module | Rôle |
@@ -154,8 +158,10 @@ journaux texte), **à ajouter**.
 | `period.lock`, `settings.save` | Changements sensibles de configuration |
 | `team.invite`, `team.update` | Changements de rôle et de permissions (élévation de privilèges) |
 
-**À ajouter dans Vortex** : `AuditEvent` ne porte pas de montant. Le résultat des gestionnaires (`HandlerResult`) devra
-exposer le montant et la quantité concernés pour les règles métier (sans libellé ni nom de client).
+**Réalisé dans Vortex** (branche `feat/sentinel-emitter`) : le résultat des gestionnaires (`HandlerResult.measure`)
+expose le montant et la quantité concernés, jamais stockés ni renvoyés au client : montant des ventes, retours, dépenses
+et mouvements de caisse (négatif pour une sortie), écart signé des clôtures de caisse (compté − théorique) et des
+ajustements de stock. Ni libellé, ni motif, ni nom de client.
 
 ## 5. Modèle d'événement normalisé
 
@@ -183,6 +189,9 @@ type SentinelEvent = {
 - `route` est la route normalisée (`/api/v1/commands/:type`), jamais l'URL avec ses paramètres.
 - `emailHash` : HMAC-SHA256 de l'adresse avec une clé propre à Sentinel. Il permet de compter les échecs par compte,
   y compris pour une adresse inexistante, sans stocker l'adresse.
+- **Clé de corrélation d'un compte** : `emailHash`, présent sur les connexions comme sur les opérations métier. Vortex a
+  deux identifiants par personne (compte d'authentification, utilisateur métier) : l'empreinte relie les deux sans
+  transmettre ni l'adresse ni l'identifiant d'authentification. C'est elle que lisent R05, R07 et R09.
 - **Adresse IP** (décidé) : conservée en clair 2 ans au plus, puis supprimée. Justification : les attaques préparées
   s'étalent sur des mois (repérage, essais espacés, passage à l'acte quand la vigilance baisse) ; une enquête doit pouvoir
   remonter jusqu'au premier contact. Garanties associées : accès réservé aux opérateurs Sentinel, chaque consultation
