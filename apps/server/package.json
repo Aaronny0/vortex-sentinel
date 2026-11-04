@@ -12,7 +12,8 @@
     "db:migrate": "bun scripts/migrate.ts",
     "local:setup": "bun scripts/local-setup.ts",
     "operator:create": "bun scripts/create-operator.ts",
-    "replay": "bun scripts/replay.ts"
+    "replay": "bun scripts/replay.ts",
+    "evaluate": "bun evaluation/run.ts"
   },
   "dependencies": {
     "@sentinel/schema": "workspace:*",
