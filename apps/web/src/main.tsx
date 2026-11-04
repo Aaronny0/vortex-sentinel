@@ -30,6 +30,10 @@ client.getQueryCache().subscribe((event) => {
     client.setQueryData(sessionQuery.queryKey, null);
 });
 
+// Application installable (PWA) : le service worker garde l'interface, jamais les données (public/sw.js).
+if (import.meta.env.PROD && 'serviceWorker' in navigator)
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => undefined));
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={client}>

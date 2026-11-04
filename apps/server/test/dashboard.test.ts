@@ -175,6 +175,8 @@ describe('interface servie par Sentinel', () => {
     mkdirSync(join(dist, 'assets'));
     writeFileSync(join(dist, 'index.html'), '<!doctype html><title>Sentinel</title>');
     writeFileSync(join(dist, 'assets', 'app.js'), 'console.log(1)');
+    writeFileSync(join(dist, 'manifest.webmanifest'), '{"name":"Vortex Sentinel"}');
+    writeFileSync(join(dist, 'sw.js'), 'self.addEventListener("fetch", () => undefined)');
     const web = createApp({ ingestPool: db.ingestPool, appPool: db.appPool, clock, secrets: ['c'.repeat(64)], operatorSecretKey: secretKey, dashboardOrigin: ORIGIN, webDist: dist });
     const get = (path: string) => web.handle(new Request(`${ORIGIN}${path}`));
     const page = await get('/incidents/123');
@@ -184,6 +186,11 @@ describe('interface servie par Sentinel', () => {
     const asset = await get('/assets/app.js');
     expect(asset.headers.get('content-type')).toBe('text/javascript; charset=utf-8');
     expect(asset.headers.get('cache-control')).toContain('immutable');
+    // Application installable : manifeste reconnu ; service worker jamais figé en cache, pour que ses mises à jour passent.
+    expect((await get('/manifest.webmanifest')).headers.get('content-type')).toBe('application/manifest+json');
+    const worker = await get('/sw.js');
+    expect(worker.headers.get('content-type')).toBe('text/javascript; charset=utf-8');
+    expect(worker.headers.get('cache-control')).toBe('no-cache');
     expect(await (await get('/assets/../../../../etc/passwd')).text()).toContain('<title>Sentinel</title>');
     expect(await (await get('/%2e%2e/%2e%2e/etc/passwd')).text()).toContain('<title>Sentinel</title>');
     expect((await get('/api/inconnu')).status).toBe(404);
@@ -222,5 +229,27 @@ describe('lectures du tableau de bord', () => {
     expect((await call('/api/incidents?status=all&severity=high', { cookie: analyst })).body).toHaveLength(1);
     expect((await call('/api/incidents?status=inconnu', { cookie: analyst })).status).toBe(422);
     expect((await call('/api/events?from=2026-01-01T00:00:00Z', { cookie: analyst })).body).toMatchObject({ code: 'VALIDATION_FAILED' });
+  });
+
+  test('évolution des erreurs : 24 tranches d’une heure, serveur et interface, rien au-delà de 24 h', async () => {
+    const now = clock.now().getTime();
+    const error = (type: 'app.error' | 'ui.error', hoursAgo: number) =>
+      storeBatch(
+        db.ingestPool,
+        [
+          eventInputSchema.parse({
+            id: randomUUID(), schemaVersion: 1, occurredAt: new Date(now).toISOString(), source: type === 'ui.error' ? 'vortex-web' : 'vortex-api', category: 'technical', type, outcome: 'failure',
+            ...(type === 'app.error' ? { http: { method: 'POST', route: '/api/v1/commands/:type', status: 500, durationMs: 12 } } : { attributes: { digest: 'abc123' } }),
+          }),
+        ],
+        new Date(now - hoursAgo * 60 * 60_000),
+      );
+    for (const hoursAgo of [0.5, 0.25, 2.5, 30]) await error('app.error', hoursAgo);
+    await error('ui.error', 0.5);
+    const { errorsLast24h } = (await call('/api/overview', { cookie: analyst })).body as { errorsLast24h: { start: string; end: string; server: number; interface: number }[] };
+    expect(errorsLast24h).toHaveLength(24);
+    expect(errorsLast24h[23]).toEqual({ start: new Date(now - 60 * 60_000).toISOString(), end: new Date(now).toISOString(), server: 2, interface: 1 });
+    expect(errorsLast24h[21]).toMatchObject({ server: 1, interface: 0 });
+    expect(errorsLast24h.reduce((total, bucket) => total + bucket.server, 0)).toBe(3);
   });
 });

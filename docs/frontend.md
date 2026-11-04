@@ -256,8 +256,15 @@ ressource extérieure, aucun cadre, aucun référent) :
   l'application. Un QR code demanderait une bibliothèque de plus.
 - **État « Dégradé »** d'un service : non affiché, car il supposerait un seuil dans le navigateur ; la lenteur est
   détectée par le serveur (R03) et apparaît comme alerte.
-- **Graphiques** : la disponibilité est rendue en 24 tranches colorées doublées d'un tableau des interruptions ; aucun
-  autre graphique pour l'instant.
+- **Graphiques** : la disponibilité est rendue en 24 tranches colorées doublées d'un tableau des interruptions ;
+  l'évolution des erreurs (vue d'ensemble) en 24 barres horaires empilées, erreurs serveur en `--primary` et
+  d'interface en `--muted-foreground`, avec échelle, axe légendé de son fuseau, valeur exacte au survol et tableau pour
+  les lecteurs d'écran. Chaque total et chaque heure ouvrent les événements correspondants.
+
+**Application installable (PWA)** : `manifest.webmanifest` (nom, icônes 192 et 512 px, icône masquable, couleurs du
+§ 3.1), `sw.js` enregistré en production. Le service worker met en cache les seuls fichiers de l'interface et une page
+hors ligne (`offline.html`, mêmes couleurs, polices du système) ; il ne touche jamais à `/api`, `/ingest` ni `/health`.
+Les icônes reprennent celle de l'onglet (pétrole, coche).
 
 Vérifié dans le navigateur : clair et sombre, 375, 1024, 1280 et 1440 px (aucun défilement horizontal à 375 px),
 prise en charge d'un incident réel, journal d'audit. Non vérifié : lecteur d'écran, navigation complète au clavier

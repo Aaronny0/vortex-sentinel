@@ -22,6 +22,8 @@ export function redactForObserver(text: string): string {
     .replace(/\bcompte [0-9a-f]{8}\b/g, 'compte •••');
 }
 
+const HOUR_MS = DAY_MS / 24;
+
 const listSchema = z.strictObject({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   before: z.iso.datetime({ offset: true, error: 'Date invalide.' }).optional(),
@@ -29,7 +31,7 @@ const listSchema = z.strictObject({
 
 export async function overview(pool: Pool, clock: Clock) {
   const now = clock.now();
-  const [probes, heartbeats, certificates, disks, incidents, alerts, engine, volume] = await Promise.all([
+  const [probes, heartbeats, certificates, disks, incidents, alerts, engine, volume, errors] = await Promise.all([
     pool.query(
       `SELECT DISTINCT ON (target) body->'attributes'->>'target' AS target, outcome, http_status AS status,
               coalesce((body->'http'->>'durationMs')::int, (body->'attributes'->>'durationMs')::int) AS "durationMs",
@@ -67,6 +69,14 @@ export async function overview(pool: Pool, clock: Clock) {
       `SELECT category, count(*)::int AS n FROM sentinel.event WHERE received_at > $1::timestamptz - interval '1 day' GROUP BY category`,
       [now],
     ),
+    // Évolution des erreurs : 24 tranches d'une heure, la dernière se termine maintenant.
+    pool.query(
+      `SELECT least(floor(extract(epoch FROM received_at - ($1::timestamptz - interval '1 day')) / 3600)::int, 23) AS bucket,
+              count(*) FILTER (WHERE type = 'app.error')::int AS server, count(*) FILTER (WHERE type = 'ui.error')::int AS interface
+       FROM sentinel.event WHERE type IN ('app.error', 'ui.error') AND received_at > $1::timestamptz - interval '1 day' AND received_at <= $1
+       GROUP BY 1`,
+      [now],
+    ),
   ]);
   const bySeverity = (rows: { severity: string; n: number }[]) => Object.fromEntries(rows.map((row) => [row.severity, row.n]));
   return {
@@ -82,6 +92,11 @@ export async function overview(pool: Pool, clock: Clock) {
     openAlerts: bySeverity(alerts.rows),
     engine: engine.rows[0],
     eventsLast24h: Object.fromEntries(volume.rows.map((row) => [row.category, row.n])),
+    errorsLast24h: Array.from({ length: 24 }, (_, index) => {
+      const bucket = errors.rows.find((row) => row.bucket === index);
+      const start = now.getTime() - DAY_MS + index * HOUR_MS;
+      return { start: new Date(start).toISOString(), end: new Date(start + HOUR_MS).toISOString(), server: bucket?.server ?? 0, interface: bucket?.interface ?? 0 };
+    }),
   };
 }
 

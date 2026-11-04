@@ -57,6 +57,9 @@ export const ruleNames: Record<string, string> = {
   R15: 'Certificat bientôt expiré',
   R16: 'Emails en échec',
   R17: 'Espace disque',
+  R18: 'Fonctionnalité en panne',
+  R19: 'Administration, adresse inhabituelle',
+  R20: "Rafale d'actions d'administration",
 };
 
 export const kindLabels: Record<string, string> = { state: 'État', window: 'Fenêtre', sequence: 'Séquence', event: 'Événement' };
@@ -93,4 +96,7 @@ export const thresholdLabels: Record<string, string> = {
   criticalDays: 'critique (jours)',
   warningPercent: 'alerte (% libre)',
   criticalPercent: 'critique (% libre)',
+  errors: 'erreurs',
+  sessionHours: 'session exclue (h)',
+  actions: 'actions sensibles',
 };

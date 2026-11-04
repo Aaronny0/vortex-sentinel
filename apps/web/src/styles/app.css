@@ -1368,3 +1368,77 @@ a.rule-ref:hover span:last-child {
     scroll-behavior: auto !important;
   }
 }
+
+/* ——— Évolution des erreurs (vue d'ensemble) ——— */
+
+.trend-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+
+.trend-total {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.trend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.trend {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  height: 96px;
+}
+
+.trend-scale {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.trend-bars {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 3px;
+  border-bottom: 1px solid var(--border);
+}
+
+.trend-column {
+  display: flex;
+  flex-direction: column-reverse;
+  min-width: 0;
+  height: 100%;
+}
+
+a.trend-column:hover .trend-bar {
+  opacity: 0.8;
+}
+
+.trend-bar {
+  display: block;
+  width: 100%;
+}
+
+.trend-server {
+  background: var(--primary);
+}
+
+.trend-interface {
+  background: var(--muted-foreground);
+}
+
+.trend-column .trend-bar:last-child {
+  border-radius: 2px 2px 0 0;
+}

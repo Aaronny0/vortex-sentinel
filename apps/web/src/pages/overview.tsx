@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { Card, CountLink, Empty, ErrorState, Loading, PageHeader, StatusLabel, Timestamp } from '../components/common.tsx';
+import { ErrorTrend } from '../components/error-trend.tsx';
 import { ServiceStatus } from '../components/service-status.tsx';
 import { SeverityBadge, SeverityIcon } from '../components/severity.tsx';
 import { overviewQuery, targetName } from '../components/shell.tsx';
@@ -115,6 +116,10 @@ export function OverviewPage() {
               ))}
             </ul>
           )}
+        </Card>
+
+        <Card title="Évolution des erreurs (24 h)" className="span-2">
+          <ErrorTrend buckets={data.errorsLast24h} linked={analyst} />
         </Card>
 
         <Card title="Activité des 24 dernières heures">

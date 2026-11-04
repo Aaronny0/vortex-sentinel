@@ -41,6 +41,9 @@ export const query = (params: Record<string, string | number | undefined | null>
   return text ? `?${text}` : '';
 };
 
+/** Une heure de la courbe des erreurs : erreurs serveur (`app.error`) et d'interface (`ui.error`). */
+export type ErrorBucket = { start: string; end: string; server: number; interface: number };
+
 export type ProbeState = { target: string; outcome: 'success' | 'failure'; status: number | null; durationMs: number | null; code: string | null; checkedAt: string };
 export type Overview = {
   generatedAt: string;
@@ -52,6 +55,7 @@ export type Overview = {
   openAlerts: Partial<Record<Severity, number>>;
   engine: { oldestCheckpoint: string | null; lastCycle: string | null };
   eventsLast24h: Partial<Record<'availability' | 'technical' | 'security' | 'business', number>>;
+  errorsLast24h: ErrorBucket[];
 };
 
 export type IncidentSummary = {

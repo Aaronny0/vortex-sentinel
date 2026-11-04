@@ -23,6 +23,7 @@ const TYPES: Record<string, string> = {
   '.ttf': 'font/ttf',
   '.txt': 'text/plain; charset=utf-8',
   '.png': 'image/png',
+  '.webmanifest': 'application/manifest+json',
 };
 
 /**
