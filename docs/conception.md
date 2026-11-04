@@ -93,11 +93,18 @@ est signalée par Better Auth (`auth.login`) et non par la capture HTTP, qui n'a
 |---|---|
 | Ingestion | `POST /ingest` : vérifie la signature HMAC et l'horodatage (anti-rejeu), valide chaque événement, déduplique par identifiant, enregistre. |
 | Sondes | Interroge `GET /api/v1/health` (API + base) et `/healthz` (Nginx web et admin) toutes les 30 s, depuis l'extérieur de Vortex ; vérifie chaque jour la date d'expiration du certificat TLS et toutes les 5 min l'espace disque de la machine. |
-| Lecteur de journaux | Lit en lecture seule le journal d'accès Nginx (même machine) : requêtes refusées, introuvables, origines. |
+| Lecteur de journaux | *Reporté à la migration sur le VPS* (voir ci-dessous). Les réponses introuvables et rejetées viennent pour l'instant de l'émetteur de Vortex. |
 | Corrélation | Évalue les règles à la réception (règles simples) et toutes les 30 s par fenêtres glissantes en SQL (règles de seuil et de séquence). |
 | Alertes et incidents | Crée les alertes, les déduplique, ouvre ou alimente les incidents, gère leur cycle de vie. |
 | Notifications | Email aux responsables pour les gravités élevée et critique. |
 | Tableau de bord | Application web propre à Sentinel : état des services, alertes, incidents, recherche d'événements. Servie par Sentinel, elle reste disponible quand Vortex est en panne. |
+
+**Journal Nginx** (décidé le 2026-11-04) : dans le déploiement actuel, Nginx est derrière Traefik dans Docker. Son
+journal porte l'adresse du proxy (`$remote_addr`), pas celle du navigateur, et part sur la sortie du conteneur plutôt que
+dans un fichier. Un lecteur ne verrait qu'un seul « visiteur ». Les pages inconnues du site sont de plus servies par
+l'application (réponse 200) : l'exploration utile vise l'API. L'émetteur de Vortex signale donc les 404 (`http.access`)
+et les requêtes rejetées avec l'adresse calculée par l'API, qui alimentent R14. Le lecteur sera repris lors de la
+migration sur le VPS, avec un format de journal qui inclut l'adresse réelle.
 
 **Hébergement** (décidé) : Sentinel tourne sur la même machine que Vortex, dans un conteneur séparé avec sa propre base.
 Limite assumée : une panne de la machine elle-même arrête les deux. Elle est discutée dans le chapitre d'évaluation ;
@@ -130,7 +137,7 @@ journaux texte), **à ajouter**.
 | `command.effect_failed` (email ou notification non exécuté) | `commands/engine.ts` | partiel |
 | `request.rejected` (413 trop volumineux, 400 illisible, 422 validation) | `error-plugin.ts` | à ajouter |
 | `log.entry` (avertissements et erreurs écrits par l'API, déjà expurgés par `safe-log.ts`) | Émetteur | partiel |
-| `http.access` (requêtes refusées ou introuvables : 4xx, 5xx) | Journal d'accès Nginx (`infra/nginx/web.conf`) | existe |
+| `http.access` (réponses introuvables : 404) | Émetteur (capture HTTP de l'API) ; journal Nginx à la migration VPS | réalisé |
 
 ### 4.3 Sécurité
 
@@ -235,6 +242,8 @@ Toutes les valeurs de seuil sont configurables ; celles-ci sont les valeurs init
   l'heure de l'événement.
 - **R08** : la capture HTTP de Vortex ne connaît pas l'utilisateur d'une requête refusée ; l'acteur est l'utilisateur
   quand il est connu, sinon le compte, sinon l'adresse IP.
+- **R14** : alimentée par l'émetteur de Vortex (404 et requêtes rejetées, avec l'adresse du navigateur), pas par le
+  journal Nginx (voir § 3.2).
 - **R09** : un compte sans aucune connexion dans les 30 jours n'a pas d'habitudes et ne déclenche pas (nouveau compte).
 
 Les règles R07 et R09 sont des **règles de séquence** : elles relient des événements de natures différentes (sécurité puis

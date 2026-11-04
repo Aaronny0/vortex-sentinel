@@ -7,12 +7,13 @@ import { r06CredentialStuffing } from './r06-credential-stuffing.ts';
 import { r07Compromise } from './r07-compromise.ts';
 import { r08AccessDenied } from './r08-access-denied.ts';
 import { r09NewIpPrivilegeChange } from './r09-new-ip-privilege-change.ts';
+import { r14ApiProbing } from './r14-api-probing.ts';
 import { r16MailFailures } from './r16-mail-failures.ts';
 import { r15CertificateExpiry } from './r15-certificate-expiry.ts';
 import { r17DiskSpace } from './r17-disk-space.ts';
 import type { Rule } from './types.ts';
 
-/** Règles actives, dans l'ordre d'évaluation. Les autres règles de la conception (§ 6) s'ajouteront ici. */
+/** Règles actives, dans l'ordre d'évaluation. Les règles métier R10 à R13 s'ajouteront ici. */
 export const rules: readonly Rule[] = [
   r01ProbeDown,
   r02HeartbeatLost,
@@ -23,6 +24,7 @@ export const rules: readonly Rule[] = [
   r07Compromise,
   r08AccessDenied,
   r09NewIpPrivilegeChange,
+  r14ApiProbing,
   r15CertificateExpiry,
   r16MailFailures,
   r17DiskSpace,

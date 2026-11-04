@@ -12,6 +12,7 @@ import { r06CredentialStuffing } from '../src/rules/r06-credential-stuffing.ts';
 import { r07Compromise } from '../src/rules/r07-compromise.ts';
 import { r08AccessDenied } from '../src/rules/r08-access-denied.ts';
 import { r09NewIpPrivilegeChange } from '../src/rules/r09-new-ip-privilege-change.ts';
+import { r14ApiProbing } from '../src/rules/r14-api-probing.ts';
 import { r16MailFailures } from '../src/rules/r16-mail-failures.ts';
 import { DAY_MS, MINUTE_MS, type Rule } from '../src/rules/types.ts';
 import { createTestDb, type TestDb } from './db.ts';
@@ -200,6 +201,30 @@ describe('R09 : changement sensible depuis une adresse inhabituelle', () => {
     await receive(login('success', 'dan', '198.51.100.72'), before(10 * MINUTE_MS));
     await receive(change('settings.save', 'dan'), before(MINUTE_MS));
     expect(await run(r09NewIpPrivilegeChange)).toMatchObject({ findings: 0 });
+  });
+});
+
+describe('R14 : exploration de l’API', () => {
+  const access = (ip: string, status: 400 | 404 | 422) =>
+    vortex({
+      type: status === 404 ? 'http.access' : 'request.rejected',
+      category: 'technical',
+      outcome: 'failure',
+      network: { ip },
+      http: { method: 'GET', route: status === 404 ? '/*' : '/api/v1/commands', status, durationMs: 2 },
+    });
+
+  test('30 réponses introuvables ou rejetées pour une adresse en 5 min : moyenne ; 29 : rien', async () => {
+    await series(30, (i) => access('198.51.100.40', i % 3 ? 404 : 422), before(0), 5 * SECOND);
+    await series(29, () => access('198.51.100.41', 404), before(0), 5 * SECOND);
+    expect(await run(r14ApiProbing)).toMatchObject({ findings: 1 });
+    expect((await alerts())[0]).toMatchObject({ key: '198.51.100.40', severity: 'medium', summary: '30 requêtes refusées ou introuvables depuis 198.51.100.40 en 5 min (dont 20 introuvables)' });
+  });
+
+  test('bord de fenêtre : une réponse de plus de 5 min ne compte plus', async () => {
+    await receive(access('198.51.100.40', 404), before(5 * MINUTE_MS));
+    await series(29, () => access('198.51.100.40', 404), before(0), 5 * SECOND);
+    expect(await run(r14ApiProbing)).toMatchObject({ findings: 0 });
   });
 });
 
