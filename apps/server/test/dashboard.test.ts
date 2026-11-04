@@ -166,6 +166,50 @@ describe('droits par rôle', () => {
   });
 });
 
+describe('interface servie par Sentinel', () => {
+  test('page et fichiers avec en-têtes de sécurité ; routes du navigateur vers index.html ; jamais hors du dossier', async () => {
+    const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dist = mkdtempSync(join(tmpdir(), 'sentinel-web-'));
+    mkdirSync(join(dist, 'assets'));
+    writeFileSync(join(dist, 'index.html'), '<!doctype html><title>Sentinel</title>');
+    writeFileSync(join(dist, 'assets', 'app.js'), 'console.log(1)');
+    const web = createApp({ ingestPool: db.ingestPool, appPool: db.appPool, clock, secrets: ['c'.repeat(64)], operatorSecretKey: secretKey, dashboardOrigin: ORIGIN, webDist: dist });
+    const get = (path: string) => web.handle(new Request(`${ORIGIN}${path}`));
+    const page = await get('/incidents/123');
+    expect(await page.text()).toContain('<title>Sentinel</title>');
+    expect(page.headers.get('content-security-policy')).toContain("frame-ancestors 'none'");
+    expect(page.headers.get('cache-control')).toBe('no-cache');
+    const asset = await get('/assets/app.js');
+    expect(asset.headers.get('content-type')).toBe('text/javascript; charset=utf-8');
+    expect(asset.headers.get('cache-control')).toContain('immutable');
+    expect(await (await get('/assets/../../../../etc/passwd')).text()).toContain('<title>Sentinel</title>');
+    expect(await (await get('/%2e%2e/%2e%2e/etc/passwd')).text()).toContain('<title>Sentinel</title>');
+    expect((await get('/api/inconnu')).status).toBe(404);
+    expect((await get('/health')).status).toBe(200);
+  });
+});
+
+describe('disponibilité', () => {
+  test('taux, tranches régulières et interruptions par cible', async () => {
+    const base = clock.now().getTime() - 3 * 60 * 60_000;
+    const probe = (outcome: 'success' | 'failure', minutes: number) =>
+      storeBatch(
+        db.ingestPool,
+        [eventInputSchema.parse({ id: randomUUID(), schemaVersion: 1, occurredAt: new Date(base).toISOString(), source: 'sentinel-probe', category: 'availability', type: 'probe.check', outcome, attributes: { target: 'vortex-api', ...(outcome === 'failure' && { code: 'TIMEOUT' }) }, ...(outcome === 'success' && { http: { method: 'GET', route: '/api/v1/health', status: 200, durationMs: 40 } }) })],
+        new Date(base + minutes * 60_000),
+      );
+    for (const [outcome, minutes] of [['success', 0], ['failure', 1], ['failure', 2], ['failure', 3], ['success', 4], ['success', 5], ['failure', 6], ['success', 7]] as const) await probe(outcome, minutes);
+    const result = (await call('/api/availability?days=1', { cookie: analyst })).body;
+    const target = result.targets.find((item: { target: string }) => item.target === 'vortex-api');
+    expect(target).toMatchObject({ checks: 8, failures: 4, availabilityPercent: 50, p95Ms: 40 });
+    expect(target.buckets).toHaveLength(24);
+    expect(result.outages.map((outage: { failures: number; code: string }) => [outage.failures, outage.code])).toEqual([[1, 'TIMEOUT'], [3, 'TIMEOUT']]);
+    expect((await call('/api/availability?days=3', { cookie: analyst })).status).toBe(422);
+  });
+});
+
 describe('lectures du tableau de bord', () => {
   test('vue d’ensemble, règles et incidents filtrés', async () => {
     const overview = (await call('/api/overview', { cookie: analyst })).body;
@@ -174,6 +218,8 @@ describe('lectures du tableau de bord', () => {
     expect(rules.map((rule) => rule.id)).toContain('R07');
     expect(rules.find((rule) => rule.id === 'R06')).toMatchObject({ alerts: 1, openAlerts: 1, falsePositives: 0 });
     expect((await call('/api/incidents?status=closed', { cookie: analyst })).body).toEqual([]);
+    expect((await call('/api/incidents?status=all&severity=critical', { cookie: analyst })).body).toEqual([]);
+    expect((await call('/api/incidents?status=all&severity=high', { cookie: analyst })).body).toHaveLength(1);
     expect((await call('/api/incidents?status=inconnu', { cookie: analyst })).status).toBe(422);
     expect((await call('/api/events?from=2026-01-01T00:00:00Z', { cookie: analyst })).body).toMatchObject({ code: 'VALIDATION_FAILED' });
   });

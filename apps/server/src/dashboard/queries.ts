@@ -87,21 +87,22 @@ export async function overview(pool: Pool, clock: Clock) {
 
 const incidentListSchema = listSchema.extend({
   status: z.enum(['active', 'all', ...incidentStatuses], { error: 'Statut inconnu.' }).default('active'),
+  severity: z.enum(['medium', 'high', 'critical'], { error: 'Gravité inconnue.' }).optional(),
 });
 
 export async function listIncidents(pool: Pool, query: unknown) {
-  const { status, limit, before } = parse(incidentListSchema, query);
+  const { status, severity, limit, before } = parse(incidentListSchema, query);
   const statuses = status === 'active' ? ['open', 'acknowledged', 'in_progress'] : status === 'all' ? [...incidentStatuses] : [status];
   const { rows } = await pool.query(
     `SELECT i.id, i.number::int AS number, i.title, i.severity, i.status, i.opened_at AS "openedAt", i.updated_at AS "updatedAt",
             i.resolved_at AS "resolvedAt", o.name AS assignee,
             (SELECT count(*)::int FROM sentinel.incident_alert ia WHERE ia.incident_id = i.id) AS alerts
      FROM sentinel.incident i LEFT JOIN sentinel.operator o ON o.id = i.assignee_id
-     WHERE i.status = ANY($1) AND ($2::timestamptz IS NULL OR i.opened_at < $2)
+     WHERE i.status = ANY($1) AND ($2::timestamptz IS NULL OR i.opened_at < $2) AND ($4::text IS NULL OR i.severity = $4)
      ORDER BY CASE WHEN i.status IN ('open','acknowledged','in_progress') THEN 0 ELSE 1 END,
               ${SEVERITY_ORDER.replace('severity', 'i.severity')} DESC, i.opened_at DESC
      LIMIT $3`,
-    [statuses, before ?? null, limit],
+    [statuses, before ?? null, limit, severity ?? null],
   );
   return rows;
 }
@@ -248,4 +249,60 @@ export async function commentIncident(pool: Pool, clock: Clock, incidentId: stri
     [incidentId, clock.now(), actorId, comment],
   );
   if (!rowCount) throw new AppError(404, 'NOT_FOUND', 'Incident introuvable.');
+}
+
+const availabilitySchema = z.strictObject({ days: z.coerce.number().int().refine((value) => [1, 7, 30].includes(value), { error: 'Période : 1, 7 ou 30 jours.' }).default(1) });
+
+/**
+ * Disponibilité par cible de sonde : taux de contrôles réussis, temps de réponse, 24 tranches régulières sur la période,
+ * et interruptions (suites d'échecs consécutifs, avec leur début, leur fin et leur durée).
+ */
+export async function availability(pool: Pool, clock: Clock, query: unknown) {
+  const { days } = parse(availabilitySchema, query);
+  const to = clock.now();
+  const from = new Date(to.getTime() - days * DAY_MS);
+  const bucketSeconds = (days * DAY_MS) / 24 / 1000;
+  const [summary, buckets, outages] = await Promise.all([
+    pool.query(
+      `SELECT body->'attributes'->>'target' AS target, count(*)::int AS checks, count(*) FILTER (WHERE outcome = 'failure')::int AS failures,
+              percentile_cont(0.95) WITHIN GROUP (ORDER BY (body->'http'->>'durationMs')::float8)::int AS "p95Ms",
+              avg((body->'http'->>'durationMs')::float8)::int AS "avgMs"
+       FROM sentinel.event WHERE type = 'probe.check' AND received_at > $1 AND received_at <= $2
+       GROUP BY 1 ORDER BY 1`,
+      [from, to],
+    ),
+    pool.query(
+      `SELECT body->'attributes'->>'target' AS target, floor(extract(epoch FROM received_at - $1::timestamptz) / $3)::int AS bucket,
+              count(*)::int AS checks, count(*) FILTER (WHERE outcome = 'failure')::int AS failures
+       FROM sentinel.event WHERE type = 'probe.check' AND received_at > $1 AND received_at <= $2
+       GROUP BY 1, 2 ORDER BY 1, 2`,
+      [from, to, bucketSeconds],
+    ),
+    pool.query(
+      `WITH checks AS (
+         SELECT body->'attributes'->>'target' AS target, received_at, outcome, body->'attributes'->>'code' AS code,
+                row_number() OVER (PARTITION BY body->'attributes'->>'target' ORDER BY received_at, id)
+                - row_number() OVER (PARTITION BY body->'attributes'->>'target', outcome ORDER BY received_at, id) AS island
+         FROM sentinel.event WHERE type = 'probe.check' AND received_at > $1 AND received_at <= $2
+       )
+       SELECT target, min(received_at) AS "startedAt", max(received_at) AS "lastFailureAt", count(*)::int AS failures,
+              (array_agg(code ORDER BY received_at DESC))[1] AS code
+       FROM checks WHERE outcome = 'failure' GROUP BY target, island ORDER BY min(received_at) DESC LIMIT 50`,
+      [from, to],
+    ),
+  ]);
+  return {
+    from: from.toISOString(),
+    to: to.toISOString(),
+    bucketMinutes: bucketSeconds / 60,
+    targets: summary.rows.map((row) => ({
+      ...row,
+      availabilityPercent: row.checks ? Math.round(((row.checks - row.failures) / row.checks) * 10000) / 100 : null,
+      buckets: Array.from({ length: 24 }, (_, index) => {
+        const bucket = buckets.rows.find((item) => item.target === row.target && item.bucket === index);
+        return { start: new Date(from.getTime() + index * bucketSeconds * 1000).toISOString(), checks: bucket?.checks ?? 0, failures: bucket?.failures ?? 0 };
+      }),
+    })),
+    outages: outages.rows,
+  };
 }

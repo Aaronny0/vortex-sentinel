@@ -53,6 +53,8 @@ const envSchema = z.object({
   SMTP_USER: z.string().min(1).optional(),
   SMTP_PASSWORD: z.string().min(1).optional(),
   MAIL_FROM: z.email({ error: 'MAIL_FROM : adresse email attendue.' }).optional(),
+  /** Interface construite servie par Sentinel (elle reste disponible quand Vortex est en panne). */
+  WEB_DIST: z.string().min(1).default(new URL('../../../web/dist', import.meta.url).pathname),
   /** Points de santé interrogés toutes les 30 s (API et sites de Vortex). */
   PROBE_TARGETS: listOf(healthTarget),
   /** Hôtes dont le certificat est vérifié chaque jour ; vide en local, où Vortex est servi en HTTP. */

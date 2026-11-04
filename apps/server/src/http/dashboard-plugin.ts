@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import type { Clock } from '../common/clock.ts';
 import { AppError } from '../common/errors.ts';
 import {
+  availability,
   commentIncident,
   getAlert,
   getIncident,
@@ -130,6 +131,10 @@ export function dashboardPlugin(deps: Deps) {
       const result = await searchEvents(pool, clock, query);
       await operators.audit(operator.id, 'event.searched', metaOf(request, clientIp), undefined, { filters: query, results: result.events.length });
       return result;
+    })
+    .get('/availability', async ({ request, query }) => {
+      await requireOperator(request);
+      return availability(pool, clock, query);
     })
     .get('/rules', async ({ request }) => {
       await requireOperator(request);

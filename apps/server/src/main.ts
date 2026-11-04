@@ -28,6 +28,7 @@ const app = createApp({
   secrets: env.INGEST_SECRETS,
   operatorSecretKey: Buffer.from(env.OPERATOR_SECRET_KEY, 'hex'),
   dashboardOrigin: env.DASHBOARD_ORIGIN,
+  webDist: env.WEB_DIST,
 }).listen({
   port: env.PORT,
   maxRequestBodySize: MAX_INGEST_BYTES + 1024,

@@ -1,0 +1,112 @@
+/* Jetons de Vortex Sentinel : docs/frontend.md § 3 à § 5. Aucune couleur hors de ce fichier. */
+
+@font-face { font-family: 'Bricolage Grotesque'; font-weight: 600; font-display: swap; src: url('/fonts/bricolage-grotesque-600.ttf') format('truetype'); }
+@font-face { font-family: 'Geist'; font-weight: 400; font-display: swap; src: url('/fonts/geist-400.ttf') format('truetype'); }
+@font-face { font-family: 'Geist'; font-weight: 500; font-display: swap; src: url('/fonts/geist-500.ttf') format('truetype'); }
+@font-face { font-family: 'Geist'; font-weight: 600; font-display: swap; src: url('/fonts/geist-600.ttf') format('truetype'); }
+@font-face { font-family: 'Geist Mono'; font-weight: 400; font-display: swap; src: url('/fonts/geist-mono-400.ttf') format('truetype'); }
+@font-face { font-family: 'Geist Mono'; font-weight: 500; font-display: swap; src: url('/fonts/geist-mono-500.ttf') format('truetype'); }
+
+:root {
+  color-scheme: light;
+  --font-display: 'Bricolage Grotesque', 'Geist', system-ui, sans-serif;
+  --font-sans: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SFMono-Regular', monospace;
+
+  --background: #f8fafa;
+  --foreground: #09191a;
+  --card: #ffffff;
+  --muted: #eef4f4;
+  --muted-foreground: #566768;
+  --border: #dde3e4;
+  --input: #7d898a;
+  --primary: #057176;
+  --primary-foreground: #fafcfc;
+  --ring: #057176;
+  --accent: #dbf3f4;
+  --success: #1a763f;
+  --sidebar: #eff6f6;
+  --overlay: rgb(9 25 26 / 0.32);
+
+  --severity-critical-solid: #c51e21;
+  --severity-critical-solid-foreground: #fcfcfc;
+  --severity-critical-muted: #feeeec;
+  --severity-critical-muted-foreground: #9e1618;
+  --severity-critical-mark: #c51e21;
+  --severity-high-solid: #c2410c;
+  --severity-high-solid-foreground: #ffffff;
+  --severity-high-muted: #ffedd5;
+  --severity-high-muted-foreground: #9a3412;
+  --severity-high-mark: #c2410c;
+  --severity-medium-solid: #e8a127;
+  --severity-medium-solid-foreground: #331b06;
+  --severity-medium-muted: #fff2d9;
+  --severity-medium-muted-foreground: #864900;
+  --severity-medium-mark: #a16207;
+  --severity-low-solid: #0470a5;
+  --severity-low-solid-foreground: #ffffff;
+  --severity-low-muted: #e8f5fe;
+  --severity-low-muted-foreground: #025884;
+  --severity-low-mark: #0470a5;
+  --severity-info-solid: #eef4f4;
+  --severity-info-solid-foreground: #566768;
+  --severity-info-muted: #eef4f4;
+  --severity-info-muted-foreground: #566768;
+  --severity-info-mark: #566768;
+
+  --radius-badge: 6px;
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-dialog: 16px;
+  --shadow-float: 0 8px 24px rgb(9 25 26 / 0.12), 0 1px 3px rgb(9 25 26 / 0.08);
+  --gutter: 16px;
+  --motion: 150ms ease-out;
+}
+
+@media (min-width: 768px) { :root { --gutter: 24px; } }
+@media (min-width: 1280px) { :root { --gutter: 32px; } }
+
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --background: #081010;
+  --foreground: #f0f4f4;
+  --card: #10191a;
+  --muted: #182122;
+  --muted-foreground: #9aa8a8;
+  --border: #232e2e;
+  --input: #5b6a6b;
+  --primary: #3ebfc6;
+  --primary-foreground: #051213;
+  --ring: #3ebfc6;
+  --accent: #0e3133;
+  --success: #4dbf74;
+  --sidebar: #050c0c;
+  --overlay: rgb(0 0 0 / 0.5);
+  --severity-critical-solid: #f75d59;
+  --severity-critical-solid-foreground: #180807;
+  --severity-critical-muted: #3f1917;
+  --severity-critical-muted-foreground: #feb5ae;
+  --severity-critical-mark: #f75d59;
+  --severity-high-solid: #fb923c;
+  --severity-high-solid-foreground: #1c0a02;
+  --severity-high-muted: #3b1d0c;
+  --severity-high-muted-foreground: #fdba74;
+  --severity-high-mark: #fb923c;
+  --severity-medium-solid: #f2b036;
+  --severity-medium-solid-foreground: #231103;
+  --severity-medium-muted: #382409;
+  --severity-medium-muted-foreground: #f4ca84;
+  --severity-medium-mark: #f2b036;
+  --severity-low-solid: #4baeed;
+  --severity-low-solid-foreground: #020f19;
+  --severity-low-muted: #08273a;
+  --severity-low-muted-foreground: #9bd2fa;
+  --severity-low-mark: #4baeed;
+  --severity-info-solid: #182122;
+  --severity-info-solid-foreground: #9aa8a8;
+  --severity-info-muted: #182122;
+  --severity-info-muted-foreground: #9aa8a8;
+  --severity-info-mark: #9aa8a8;
+  --shadow-float: 0 8px 24px rgb(0 0 0 / 0.5), 0 1px 3px rgb(0 0 0 / 0.4);
+}

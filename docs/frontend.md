@@ -238,3 +238,27 @@ d'ensemble et la barre d'état, 30 s ailleurs), suspendu quand l'onglet est cach
 - [ ] Clavier, focus, lecteur d'écran, contraste vérifiés en clair et en sombre.
 - [ ] 375 px, 768 px, 1440 px sans débordement horizontal.
 - [ ] Données de test uniquement dans les captures du mémoire.
+
+## 14. État de la mise en œuvre (2026-11-04)
+
+Réalisé dans `apps/web`, servi par le serveur de Sentinel (`WEB_DIST`) avec une politique de sécurité stricte (CSP sans
+ressource extérieure, aucun cadre, aucun référent) :
+
+- connexion en deux temps et activation de la double authentification ;
+- barre d'état, rail selon le rôle, thème clair, sombre ou système ;
+- vue d'ensemble, incidents (liste et détail côte à côte à partir de 1280 px, chronologie, actions du cycle de vie,
+  commentaires), alertes et leurs preuves, recherche d'événements, disponibilité (24 h, 7 j, 30 j), règles,
+  administration (opérateurs, journal des actions).
+
+Écarts assumés, à reprendre si besoin :
+
+- **Pas de QR code** à l'activation : la clé est affichée par groupes de 4 et un lien `otpauth://` l'ouvre dans
+  l'application. Un QR code demanderait une bibliothèque de plus.
+- **État « Dégradé »** d'un service : non affiché, car il supposerait un seuil dans le navigateur ; la lenteur est
+  détectée par le serveur (R03) et apparaît comme alerte.
+- **Graphiques** : la disponibilité est rendue en 24 tranches colorées doublées d'un tableau des interruptions ; aucun
+  autre graphique pour l'instant.
+
+Vérifié dans le navigateur : clair et sombre, 375, 1024, 1280 et 1440 px (aucun défilement horizontal à 375 px),
+prise en charge d'un incident réel, journal d'audit. Non vérifié : lecteur d'écran, navigation complète au clavier
+écran par écran.

@@ -6,6 +6,7 @@ import { errorPlugin } from './http/error-plugin.ts';
 import { INGEST_RATE, ingestPlugin } from './ingest/ingest-plugin.ts';
 import { createReplayGuard, type ReplayGuard } from './ingest/replay-guard.ts';
 import { dashboardPlugin } from './http/dashboard-plugin.ts';
+import { staticPlugin } from './http/static-plugin.ts';
 import { createOperatorService } from './operators/service.ts';
 
 /** Au-delà, le moteur de corrélation est en retard : la santé passe en « dégradée ». */
@@ -23,6 +24,8 @@ export type AppDeps = {
   dashboardOrigin: string;
   /** Débit d'ingestion (tests) ; par défaut INGEST_RATE. */
   ingestRate?: typeof INGEST_RATE;
+  /** Dossier de l'interface construite ; absent : l'API seule. */
+  webDist?: string;
 };
 
 export function createApp(deps: AppDeps) {
@@ -48,5 +51,6 @@ export function createApp(deps: AppDeps) {
       return { status: late ? ('degraded' as const) : ('ok' as const), engine: { lastCycle: engine.lastCycle?.toISOString() ?? null, lagSeconds, rules: engine.rules } };
     })
     .use(ingestPlugin({ pool: deps.ingestPool, clock: deps.clock, secrets: deps.secrets, replayGuard: deps.replayGuard ?? createReplayGuard(), rate: deps.ingestRate }))
-    .use(dashboardPlugin({ pool: deps.appPool, clock: deps.clock, operators, dashboardOrigin: deps.dashboardOrigin }));
+    .use(dashboardPlugin({ pool: deps.appPool, clock: deps.clock, operators, dashboardOrigin: deps.dashboardOrigin }))
+    .use(deps.webDist ? staticPlugin(deps.webDist) : new Elysia({ name: 'static-off' }));
 }
