@@ -217,6 +217,16 @@ describe('disponibilité', () => {
   });
 });
 
+describe('démonstration locale sans connexion (DEMO_NO_AUTH)', () => {
+  test('sans cookie, le tableau de bord agit comme le premier administrateur actif ; désactivé, il exige une session', async () => {
+    const demo = createApp({ ingestPool: db.ingestPool, appPool: db.appPool, clock, secrets: ['c'.repeat(64)], operatorSecretKey: secretKey, dashboardOrigin: ORIGIN, demoNoAuth: true });
+    const response = await demo.handle(new Request(`${ORIGIN}/api/session`));
+    expect(response.status).toBe(200);
+    expect(((await response.json()) as { operator: { email: string; role: string } }).operator).toMatchObject({ email: 'admin@sentinel.test', role: 'admin' });
+    expect((await call('/api/session')).status).toBe(401);
+  });
+});
+
 describe('lectures du tableau de bord', () => {
   test('vue d’ensemble, règles et incidents filtrés', async () => {
     const overview = (await call('/api/overview', { cookie: analyst })).body;

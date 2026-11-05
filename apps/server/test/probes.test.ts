@@ -203,6 +203,13 @@ describe('configuration des sondes', () => {
     expect(loadEnv(base)).toMatchObject({ PROBE_TARGETS: [], TLS_TARGETS: [], DISK_PATHS: ['/'] });
   });
 
+  test('DEMO_NO_AUTH : accepté en local, refusé en production ou hors de localhost', () => {
+    expect(loadEnv({ ...base, DEMO_NO_AUTH: 'on' }).DEMO_NO_AUTH).toBe('on');
+    expect(() => loadEnv({ ...base, DEMO_NO_AUTH: 'on', NODE_ENV: 'production' })).toThrow('DEMO_NO_AUTH');
+    expect(() => loadEnv({ ...base, DEMO_NO_AUTH: 'on', DASHBOARD_ORIGIN: 'https://sentinel.vortex.example' })).toThrow('DEMO_NO_AUTH');
+    expect(loadEnv(base).DEMO_NO_AUTH).toBe('off');
+  });
+
   test('refuse une cible mal formée en nommant la variable', () => {
     for (const [name, value] of [
       ['PROBE_TARGETS', 'http://vortex.test/health'],

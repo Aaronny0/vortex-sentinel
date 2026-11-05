@@ -61,7 +61,16 @@ const envSchema = z.object({
   TLS_TARGETS: listOf(tlsTarget),
   /** Systèmes de fichiers surveillés toutes les 5 min : celui de PostgreSQL et des journaux. */
   DISK_PATHS: listOf(z.string().startsWith('/', { error: 'Chemin de disque absolu attendu.' }), '/'),
-});
+  /**
+   * Démonstration locale sans connexion : le tableau de bord agit comme le premier administrateur actif. Refusé hors de
+   * localhost et en production (voir le contrôle ci-dessous) : ce mode ne peut pas partir sur le VPS.
+   */
+  DEMO_NO_AUTH: z.enum(['on', 'off']).default('off'),
+  NODE_ENV: z.string().optional(),
+}).refine(
+  (env) => env.DEMO_NO_AUTH === 'off' || (env.NODE_ENV !== 'production' && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(env.DASHBOARD_ORIGIN)),
+  { error: 'DEMO_NO_AUTH=on est réservé au développement local (DASHBOARD_ORIGIN en http://localhost, hors production).', path: ['DEMO_NO_AUTH'] },
+);
 
 export type Env = z.infer<typeof envSchema>;
 

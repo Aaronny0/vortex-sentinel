@@ -22,6 +22,8 @@ export type AppDeps = {
   operatorSecretKey: Buffer;
   /** Origine du tableau de bord (`https://sentinel.example`) : seule autorisée à écrire. */
   dashboardOrigin: string;
+  /** Démonstration locale sans connexion (DEMO_NO_AUTH). */
+  demoNoAuth?: boolean;
   /** Débit d'ingestion (tests) ; par défaut INGEST_RATE. */
   ingestRate?: typeof INGEST_RATE;
   /** Dossier de l'interface construite ; absent : l'API seule. */
@@ -51,6 +53,6 @@ export function createApp(deps: AppDeps) {
       return { status: late ? ('degraded' as const) : ('ok' as const), engine: { lastCycle: engine.lastCycle?.toISOString() ?? null, lagSeconds, rules: engine.rules } };
     })
     .use(ingestPlugin({ pool: deps.ingestPool, clock: deps.clock, secrets: deps.secrets, replayGuard: deps.replayGuard ?? createReplayGuard(), rate: deps.ingestRate }))
-    .use(dashboardPlugin({ pool: deps.appPool, clock: deps.clock, operators, dashboardOrigin: deps.dashboardOrigin }))
+    .use(dashboardPlugin({ pool: deps.appPool, clock: deps.clock, operators, dashboardOrigin: deps.dashboardOrigin, demoNoAuth: deps.demoNoAuth }))
     .use(deps.webDist ? staticPlugin(deps.webDist) : new Elysia({ name: 'static-off' }));
 }

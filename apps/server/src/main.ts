@@ -29,11 +29,13 @@ const app = createApp({
   operatorSecretKey: Buffer.from(env.OPERATOR_SECRET_KEY, 'hex'),
   dashboardOrigin: env.DASHBOARD_ORIGIN,
   webDist: env.WEB_DIST,
+  demoNoAuth: env.DEMO_NO_AUTH === 'on',
 }).listen({
   port: env.PORT,
   maxRequestBodySize: MAX_INGEST_BYTES + 1024,
 });
 console.log(`Sentinel démarré sur le port ${env.PORT}`);
+if (env.DEMO_NO_AUTH === 'on') console.warn('DÉMONSTRATION : tableau de bord sans connexion (DEMO_NO_AUTH=on), réservé au local.');
 
 const probeConfig = { health: env.PROBE_TARGETS, tls: env.TLS_TARGETS, disks: env.DISK_PATHS };
 const probeLoops = startProbes(createProbes({ ingestPool, clock, config: probeConfig }), probeConfig);

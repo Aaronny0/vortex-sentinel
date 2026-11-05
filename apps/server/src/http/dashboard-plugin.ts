@@ -20,7 +20,7 @@ import { SESSION, type Operator, type OperatorService, type RequestMeta, type Ro
 
 export const SESSION_COOKIE = 'sentinel_session';
 
-type Deps = { pool: Pool; clock: Clock; operators: OperatorService; dashboardOrigin: string };
+type Deps = { pool: Pool; clock: Clock; operators: OperatorService; dashboardOrigin: string; demoNoAuth?: boolean };
 
 const readCookie = (request: Request, name: string) =>
   request.headers
@@ -46,9 +46,18 @@ export function dashboardPlugin(deps: Deps) {
   const checkOrigin = (request: Request) => {
     if (request.method !== 'GET' && request.headers.get('origin') !== dashboardOrigin) throw new AppError(403, 'ORIGIN_REFUSED', 'Origine refusée.');
   };
+  /** Démonstration locale (DEMO_NO_AUTH, refusé hors de localhost) : le premier administrateur actif, sans connexion. */
+  const demoOperator = async (): Promise<Operator | null> => {
+    const { rows } = await pool.query<{ id: string; email: string; name: string; role: Role; totp_enabled: boolean }>(
+      `SELECT id, email, name, role, totp_secret IS NOT NULL AS totp_enabled FROM sentinel.operator
+       WHERE role = 'admin' AND NOT disabled ORDER BY created_at, id LIMIT 1`,
+    );
+    const row = rows[0];
+    return row ? { id: row.id, email: row.email, name: row.name, role: row.role, totpEnabled: row.totp_enabled } : null;
+  };
   const requireOperator = async (request: Request, allowed: readonly Role[] = ['admin', 'analyst', 'observer']): Promise<Operator> => {
     checkOrigin(request);
-    const operator = await operators.resolveSession(readCookie(request, SESSION_COOKIE));
+    const operator = deps.demoNoAuth ? await demoOperator() : await operators.resolveSession(readCookie(request, SESSION_COOKIE));
     if (!operator) throw new AppError(401, 'UNAUTHENTICATED', 'Connexion requise.');
     if (!allowed.includes(operator.role)) throw new AppError(403, 'FORBIDDEN', "Votre rôle ne permet pas cette action.");
     return operator;
